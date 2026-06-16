@@ -36,9 +36,9 @@ export default function Flashcards() {
 
   return (
     <div>
-      <h1 className="page-title">フラッシュカード</h1>
+      <h1 className="page-title">🃏 記憶の修練場</h1>
       <p className="page-sub">
-        カードをクリックして裏返し、覚えた用語をチェックしましょう。（{index + 1} / {deck.length}）
+        カードをタップで裏返し、習得した呪文（用語）に印を付けよう。習得ごとに +5 XP！（{index + 1} / {deck.length}）
       </p>
 
       <div className="toolbar">
@@ -54,7 +54,7 @@ export default function Flashcards() {
             className={`chip ${filter === d.id ? 'active' : ''}`}
             onClick={() => changeFilter(d.id)}
           >
-            {d.name.split(' ')[0]}
+            {d.name.split(/[ （(]/)[0]}
           </button>
         ))}
       </div>
