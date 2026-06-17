@@ -2,7 +2,7 @@ import { createContext, useContext, useCallback, useMemo, useState, useRef } fro
 import { useLocalStorage } from './useLocalStorage'
 import { questions } from '../data/quizzes'
 import { flashcards } from '../data/flashcards'
-import { BADGES, XP, levelInfo } from '../data/gamification'
+import { BADGES, XP, levelInfo, stagesClearedCount, avatarRank } from '../data/gamification'
 
 const STORAGE_KEY = 'sf-learner-progress-v2'
 
@@ -59,6 +59,7 @@ export function ProgressProvider({ children }) {
     (mutate, { touchStreak = true } = {}) => {
       const before = normalize(stored)
       const beforeLevel = levelInfo(before.xp).level
+      const beforeStages = stagesClearedCount(before)
       const next = mutate({ ...before })
 
       if (touchStreak) {
@@ -89,13 +90,17 @@ export function ProgressProvider({ children }) {
       setStored(next)
 
       // 演出トースト
+      const afterStages = stagesClearedCount(next)
+      if (afterStages > beforeStages) {
+        pushToast({
+          type: 'evolve',
+          title: '単元クリア！キャラクターが成長しました',
+          desc: `新しい称号：${avatarRank(afterStages).title}`,
+        })
+      }
       const afterLevel = levelInfo(next.xp).level
       if (afterLevel > beforeLevel) {
-        pushToast({
-          type: 'levelup',
-          title: `レベルアップ！ Lv.${afterLevel}`,
-          desc: levelInfo(next.xp).title,
-        })
+        pushToast({ type: 'levelup', title: `レベルアップ！ Lv.${afterLevel}`, desc: '経験値が貯まりました' })
       }
       newlyUnlocked.forEach((b) =>
         pushToast({ type: 'badge', title: `バッジ獲得：${b.name}`, desc: b.desc, icon: b.icon }),
@@ -123,7 +128,7 @@ export function ProgressProvider({ children }) {
         draft.maxCombo = Math.max(draft.maxCombo || 0, combo)
         return draft
       })
-      pushToast({ type: 'xp', title: `+${gained} XP`, desc: isCorrect ? '正解！' : '挑戦XP' })
+      pushToast({ type: 'xp', title: `+${gained} pt`, desc: isCorrect ? '正解' : '回答' })
     },
     [applyUpdate, pushToast],
   )
@@ -139,7 +144,7 @@ export function ProgressProvider({ children }) {
         return draft
       })
       if (bonus > 0)
-        pushToast({ type: 'xp', title: `クリアボーナス +${bonus} XP`, desc: 'クエスト達成！' })
+        pushToast({ type: 'xp', title: `クリアボーナス +${bonus} pt`, desc: '演習クリア' })
     },
     [applyUpdate, pushToast],
   )
@@ -160,24 +165,27 @@ export function ProgressProvider({ children }) {
         { touchStreak: !wasReviewed },
       )
       if (!wasReviewed)
-        pushToast({ type: 'xp', title: `+${XP.CARD_REVIEW} XP`, desc: 'カードを習得' })
+        pushToast({ type: 'xp', title: `+${XP.CARD_REVIEW} pt`, desc: 'カードを習得' })
     },
     [applyUpdate, progress.reviewedCards, pushToast],
   )
 
   const reset = useCallback(() => setStored(emptyProgress), [setStored])
 
+  const stagesCleared = stagesClearedCount(progress)
   const value = useMemo(
     () => ({
       progress,
       level: levelInfo(progress.xp),
+      stagesCleared,
+      rank: avatarRank(stagesCleared),
       recordAnswer,
       recordSession,
       toggleReviewed,
       reset,
       toasts,
     }),
-    [progress, recordAnswer, recordSession, toggleReviewed, reset, toasts],
+    [progress, stagesCleared, recordAnswer, recordSession, toggleReviewed, reset, toasts],
   )
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>

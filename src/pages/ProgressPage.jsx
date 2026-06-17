@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import { domains } from '../data/domains'
 import { questions } from '../data/quizzes'
 import { useProgress } from '../hooks/useProgress'
-import { BADGES } from '../data/gamification'
+import { BADGES, AVATAR_RANKS, isStageCleared } from '../data/gamification'
+import Avatar from '../components/Avatar'
 
 function formatDate(ts) {
   const d = new Date(ts)
@@ -12,7 +13,7 @@ function formatDate(ts) {
 }
 
 export default function ProgressPage() {
-  const { progress, level, reset } = useProgress()
+  const { progress, level, stagesCleared, rank, reset } = useProgress()
 
   const answeredEntries = Object.entries(progress.answers)
   const answered = answeredEntries.length
@@ -20,59 +21,70 @@ export default function ProgressPage() {
   const accuracy = answered ? Math.round((correct / answered) * 100) : 0
 
   function handleReset() {
-    if (window.confirm('冒険の記録をすべて消去します。よろしいですか？')) reset()
+    if (window.confirm('学習データをすべて削除します。よろしいですか？')) reset()
   }
 
   return (
     <div>
-      <h1 className="page-title">🏆 冒険の記録</h1>
-      <p className="page-sub">これまでの歩みと獲得した称号を振り返ろう。</p>
+      <h1 className="page-title">進捗・実績</h1>
+      <p className="page-sub">これまでの学習状況と、成長したキャラクターを確認できます。</p>
 
-      {/* Hero ステータス */}
-      <div className="card" style={{ marginBottom: 28, borderColor: 'var(--border-glow)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <div className="hero-avatar" style={{ width: 64, height: 64, fontSize: 34 }}>
-            🧙
+      {/* アバター + ステータス */}
+      <div className="growth-card" style={{ marginBottom: 24 }}>
+        <Avatar stage={stagesCleared} size={104} glow />
+        <div className="growth-info">
+          <div className="growth-rank">{rank.title}</div>
+          <div className="growth-progress-label">
+            Lv.{level.level}・{level.xp} pt ／ 単元クリア {stagesCleared} / {domains.length}
           </div>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontFamily: 'var(--head-font)', fontSize: 20, color: 'var(--gold)' }}>
-              Lv.{level.level} {level.title}
-            </div>
-            <div className="xp-bar" style={{ marginTop: 8 }}>
-              <span style={{ width: `${level.pct}%` }} />
-            </div>
-            <div className="xp-meta">
-              <span>{level.xp} XP</span>
-              <span>次のレベルまで {level.toNext} XP</span>
-            </div>
+          <div className="xp-bar" style={{ marginTop: 6 }}>
+            <span style={{ width: `${level.pct}%` }} />
           </div>
         </div>
       </div>
 
-      <div className="stat-row">
+      {/* 成長の記録（アバター進化ギャラリー） */}
+      <h2 className="section-title">成長の記録</h2>
+      <p className="page-sub" style={{ marginTop: 4 }}>
+        単元をクリアするたびにキャラクターが成長します。（{stagesCleared} / 7 段階）
+      </p>
+      <div className="evolution-row">
+        {AVATAR_RANKS.map((r, i) => {
+          const reached = i <= stagesCleared
+          return (
+            <div key={i} className={`evo-cell ${reached ? 'reached' : 'locked'}`}>
+              <Avatar stage={i} size={64} />
+              <div className="evo-title">{r.title}</div>
+              <div className="evo-step">{i === 0 ? 'スタート' : `${i}単元クリア`}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="stat-row" style={{ marginTop: 24 }}>
         <div className="stat">
           <div className="num">
             {answered}/{questions.length}
           </div>
-          <div className="label">挑んだ問題</div>
+          <div className="label">回答した問題</div>
         </div>
         <div className="stat">
           <div className="num">{accuracy}%</div>
           <div className="label">正答率</div>
         </div>
         <div className="stat">
-          <div className="num">🔥 {progress.streak.best}</div>
-          <div className="label">最高連続日数</div>
+          <div className="num">{progress.streak.best}</div>
+          <div className="label">最高連続学習日数</div>
         </div>
         <div className="stat">
-          <div className="num">⚡ {progress.maxCombo}</div>
-          <div className="label">最大コンボ</div>
+          <div className="num">{progress.maxCombo}</div>
+          <div className="label">最大連続正解</div>
         </div>
       </div>
 
-      {/* バッジコレクション */}
-      <h2 style={{ fontFamily: 'var(--head-font)', fontSize: 18 }}>
-        🏅 称号コレクション（{progress.badges.length}/{BADGES.length}）
+      {/* 実績バッジ */}
+      <h2 className="section-title">
+        実績バッジ（{progress.badges.length}/{BADGES.length}）
       </h2>
       <div className="badge-grid" style={{ margin: '12px 0 28px' }}>
         {BADGES.map((b) => {
@@ -87,22 +99,23 @@ export default function ProgressPage() {
         })}
       </div>
 
-      {/* ドメイン別 習熟度 */}
-      <h2 style={{ fontFamily: 'var(--head-font)', fontSize: 18 }}>🗺️ ステージ攻略度</h2>
+      {/* 単元別 習熟度 */}
+      <h2 className="section-title">単元別 習熟度</h2>
       <div className="grid" style={{ marginTop: 12, marginBottom: 28 }}>
         {domains.map((d) => {
           const dq = questions.filter((q) => q.domain === d.id)
           const dCorrect = dq.filter((q) => progress.answers[q.id]?.correct).length
           const pct = dq.length ? Math.round((dCorrect / dq.length) * 100) : 0
+          const cleared = isStageCleared(progress, d.id)
           return (
             <div className="card" key={d.id} style={{ padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <strong style={{ fontSize: 14 }}>{d.name}</strong>
-                <span style={{ color: 'var(--muted)', fontSize: 13 }}>
-                  {dCorrect}/{dq.length} 制覇
+                <span style={{ color: cleared ? 'var(--green)' : 'var(--muted)', fontSize: 13 }}>
+                  {cleared ? 'クリア済み' : `${dCorrect}/${dq.length} 正解`}
                 </span>
               </div>
-              <div className="mini-bar" style={{ height: 8 }}>
+              <div className="bar">
                 <span style={{ width: `${pct}%`, background: d.color }} />
               </div>
             </div>
@@ -111,13 +124,13 @@ export default function ProgressPage() {
       </div>
 
       {/* 演習履歴 */}
-      <h2 style={{ fontFamily: 'var(--head-font)', fontSize: 18 }}>📜 戦いの記録</h2>
+      <h2 className="section-title">演習履歴</h2>
       {progress.sessions.length === 0 ? (
         <div className="empty">
-          まだ記録がない。最初のクエストに挑もう！
+          まだ演習記録がありません。
           <br />
           <Link className="btn gold" style={{ marginTop: 16 }} to="/quiz">
-            ⚔️ クエストを始める
+            問題演習を始める
           </Link>
         </div>
       ) : (
@@ -125,7 +138,7 @@ export default function ProgressPage() {
           {progress.sessions.map((s, i) => {
             const label =
               s.domainId === 'all'
-                ? '全クエスト'
+                ? '全範囲'
                 : domains.find((d) => d.id === s.domainId)?.name ?? s.domainId
             const pct = Math.round((s.score / s.total) * 100)
             return (
@@ -152,7 +165,7 @@ export default function ProgressPage() {
 
       <div style={{ marginTop: 32 }}>
         <button className="btn secondary" onClick={handleReset}>
-          🗑 冒険の記録をリセット
+          学習データをリセット
         </button>
       </div>
     </div>

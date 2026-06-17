@@ -1,43 +1,41 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { ProgressProvider, useProgress } from './hooks/useProgress'
 import Toaster from './components/Toaster'
+import Avatar from './components/Avatar'
 import Dashboard from './pages/Dashboard'
 import Quiz from './pages/Quiz'
 import Flashcards from './pages/Flashcards'
 import Study from './pages/Study'
 import ProgressPage from './pages/ProgressPage'
+import Roadmap from './pages/Roadmap'
 
 const navItems = [
-  { to: '/', label: '冒険マップ', icon: '🗺️', end: true },
-  { to: '/quiz', label: 'クエスト（演習）', icon: '⚔️' },
-  { to: '/flashcards', label: '記憶の修練場', icon: '🃏' },
-  { to: '/study', label: '知恵の書庫', icon: '📖' },
-  { to: '/progress', label: '冒険の記録', icon: '🏆' },
+  { to: '/', label: '学習マップ', icon: '◈', end: true },
+  { to: '/roadmap', label: 'ロードマップ', icon: '◇' },
+  { to: '/quiz', label: '問題演習', icon: '▤' },
+  { to: '/flashcards', label: 'フラッシュカード', icon: '▢' },
+  { to: '/study', label: '学習教材', icon: '▥' },
+  { to: '/progress', label: '進捗・実績', icon: '▦' },
 ]
 
 function HeroPanel() {
-  const { level, progress } = useProgress()
+  const { level, stagesCleared, rank } = useProgress()
   return (
     <div className="hero-panel">
       <div className="hero-top">
-        <div className="hero-avatar">🧙</div>
+        <Avatar stage={stagesCleared} size={56} />
         <div>
-          <div className="hero-level">Lv.{level.level}</div>
-          <div className="hero-title">{level.title}</div>
+          <div className="hero-rank">{rank.title}</div>
+          <div className="hero-sub">単元クリア {stagesCleared} / 7</div>
         </div>
       </div>
       <div className="xp-bar">
         <span style={{ width: `${level.pct}%` }} />
       </div>
       <div className="xp-meta">
-        <span>{level.xp} XP</span>
+        <span>Lv.{level.level}・{level.xp} pt</span>
         <span>次まで {level.toNext}</span>
       </div>
-      {progress.streak.count > 0 && (
-        <div className="streak-flame">
-          🔥 {progress.streak.count}日連続（最高 {progress.streak.best}日）
-        </div>
-      )}
     </div>
   )
 }
@@ -47,10 +45,10 @@ function Shell() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <img src={`${import.meta.env.BASE_URL}cloud.svg`} alt="" width="28" height="28" />
+          <img src={`${import.meta.env.BASE_URL}cloud.svg`} alt="" width="26" height="26" />
           <div>
-            <strong>SF QUEST</strong>
-            <span>認定アドミン 冒険の書</span>
+            <strong>SF Learner</strong>
+            <span>Salesforce 認定アドミン対策</span>
           </div>
         </div>
         <HeroPanel />
@@ -67,13 +65,12 @@ function Shell() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          冒険の記録はこの端末（localStorage）に保存されます。
-        </div>
+        <div className="sidebar-footer">学習データはこの端末（localStorage）に保存されます。</div>
       </aside>
       <main className="content">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/roadmap" element={<Roadmap />} />
           <Route path="/quiz" element={<Quiz />} />
           <Route path="/quiz/:domainId" element={<Quiz />} />
           <Route path="/flashcards" element={<Flashcards />} />

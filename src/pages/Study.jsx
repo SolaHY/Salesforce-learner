@@ -7,8 +7,8 @@ import { flashcardsByDomain } from '../data/flashcards'
 function DomainList() {
   return (
     <div>
-      <h1 className="page-title">📖 知恵の書庫</h1>
-      <p className="page-sub">古の書物で各試練の極意を学ぼう。挑戦前の予習に最適。</p>
+      <h1 className="page-title">学習教材</h1>
+      <p className="page-sub">単元を選んで要点を確認しましょう。演習前の予習に最適です。</p>
       <div className="grid grid-2">
         {domains.map((d) => (
           <Link
@@ -42,7 +42,7 @@ export default function Study() {
     return (
       <div>
         <Link className="back-link" to="/study">
-          ← 書庫へ戻る
+          ← 教材一覧へ
         </Link>
         <div className="empty">教材が見つかりません。</div>
       </div>
@@ -55,7 +55,7 @@ export default function Study() {
   return (
     <div>
       <Link className="back-link" to="/study">
-        ← 書庫へ戻る
+        ← 教材一覧へ
       </Link>
       <h1 className="page-title">{domain.name}</h1>
       <p className="page-sub">
@@ -77,10 +77,10 @@ export default function Study() {
 
       <div className="toolbar" style={{ marginTop: 24 }}>
         <Link className="btn gold" to={`/quiz/${domainId}`}>
-          ⚔️ この試練に挑む（{qCount}問）
+          この単元を演習（{qCount}問）
         </Link>
         <Link className="btn secondary" to="/flashcards">
-          🃏 記憶の修練場（{fcCount}枚）
+          フラッシュカード（{fcCount}枚）
         </Link>
       </div>
     </div>

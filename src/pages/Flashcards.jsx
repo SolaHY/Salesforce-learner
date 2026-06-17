@@ -36,9 +36,9 @@ export default function Flashcards() {
 
   return (
     <div>
-      <h1 className="page-title">🃏 記憶の修練場</h1>
+      <h1 className="page-title">フラッシュカード</h1>
       <p className="page-sub">
-        カードをタップで裏返し、習得した呪文（用語）に印を付けよう。習得ごとに +5 XP！（{index + 1} / {deck.length}）
+        カードをタップで裏返し、覚えた用語に印を付けましょう。（{index + 1} / {deck.length}）
       </p>
 
       <div className="toolbar">
