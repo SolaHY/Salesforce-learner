@@ -8,6 +8,7 @@ import Flashcards from './pages/Flashcards'
 import Study from './pages/Study'
 import ProgressPage from './pages/ProgressPage'
 import Roadmap from './pages/Roadmap'
+import LearningPortal from './pages/LearningPortal'
 
 const navItems = [
   { to: '/', label: '学習マップ', icon: '◈', end: true },
@@ -16,6 +17,7 @@ const navItems = [
   { to: '/flashcards', label: 'フラッシュカード', icon: '▢' },
   { to: '/study', label: '学習教材', icon: '▥' },
   { to: '/progress', label: '進捗・実績', icon: '▦' },
+  { to: '/portal', label: '学習ポータル', icon: '◎' },
 ]
 
 function HeroPanel() {
@@ -77,6 +79,7 @@ function Shell() {
           <Route path="/study" element={<Study />} />
           <Route path="/study/:domainId" element={<Study />} />
           <Route path="/progress" element={<ProgressPage />} />
+          <Route path="/portal" element={<LearningPortal />} />
         </Routes>
       </main>
       <Toaster />

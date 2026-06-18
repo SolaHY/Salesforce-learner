@@ -981,6 +981,43 @@ nav {
   font-size: 14px;
 }
 
+/* ============ Learning portal ============ */
+.portal-card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.14s, box-shadow 0.14s, border-color 0.14s;
+}
+.portal-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  border-color: var(--border-glow);
+}
+.portal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.portal-arrow {
+  color: var(--blue);
+  font-size: 18px;
+  font-weight: 800;
+  transition: transform 0.14s;
+}
+.portal-card:hover .portal-arrow {
+  transform: translate(2px, -2px);
+}
+.portal-host {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--head-font);
+  letter-spacing: 0.3px;
+  word-break: break-all;
+}
+
 /* ============ Badges ============ */
 .badge-grid {
   display: grid;
