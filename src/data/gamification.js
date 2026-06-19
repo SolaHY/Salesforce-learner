@@ -1,6 +1,6 @@
 import { domains } from './domains'
 
-// ゲーミフィケーション定義：XP / レベル / 称号 / バッジ
+// 進捗・称号・実績の定義（ポイント制度は廃止）
 
 // ステージ（ドメイン）クリア判定：そのドメインで正答率70%以上のセッションが1回でもあればクリア
 export const STAGE_CLEAR_PCT = 0.7
@@ -33,38 +33,6 @@ export function avatarRank(stagesCleared) {
   return AVATAR_RANKS[Math.max(0, Math.min(AVATAR_RANKS.length - 1, stagesCleared))]
 }
 
-// 各レベルに到達するのに必要な「累計XP」。cumXp(L) = 50 * (L-1) * L
-export function cumXpForLevel(level) {
-  return 50 * (level - 1) * level
-}
-
-// 総XPからレベル情報を算出
-export function levelInfo(xp) {
-  let level = 1
-  while (cumXpForLevel(level + 1) <= xp) level += 1
-  const curBase = cumXpForLevel(level)
-  const nextBase = cumXpForLevel(level + 1)
-  const intoLevel = xp - curBase
-  const span = nextBase - curBase
-  return {
-    level,
-    xp,
-    intoLevel,
-    span,
-    toNext: nextBase - xp,
-    pct: Math.min(100, Math.round((intoLevel / span) * 100)),
-  }
-}
-
-// XP 報酬
-export const XP = {
-  CORRECT: 10,
-  WRONG: 2,
-  CARD_REVIEW: 5,
-  SESSION_PER_CORRECT: 5,
-  PERFECT_BONUS: 50,
-}
-
 // 演習スコアの評価（S/A/B/C/D）
 export function scoreRank(pct) {
   if (pct === 100) return { rank: 'S', label: '満点です', color: '#ffcf5a' }
@@ -84,11 +52,11 @@ export const BADGES = [
     check: (p) => Object.keys(p.answers).length >= 1,
   },
   {
-    id: 'sharp-shooter',
+    id: 'first-clear',
     icon: '🎯',
-    name: '連続正解 5',
-    desc: '5問連続で正解した',
-    check: (p) => (p.maxCombo || 0) >= 5,
+    name: '初クリア',
+    desc: '単元テストを初めてクリアした',
+    check: (p) => stagesClearedCount(p) >= 1,
   },
   {
     id: 'card-master',
@@ -131,11 +99,11 @@ export const BADGES = [
     check: (p) => (p.sessions || []).some((s) => s.score === s.total && s.total > 0),
   },
   {
-    id: 'level-5',
+    id: 'half-way',
     icon: '⭐',
-    name: 'レベル5到達',
-    desc: 'レベル5に到達した',
-    check: (p) => levelInfo(p.xp || 0).level >= 5,
+    name: '折り返し',
+    desc: '4単元をクリアした',
+    check: (p) => stagesClearedCount(p) >= 4,
   },
   {
     id: 'map-conqueror',

@@ -13,7 +13,7 @@ function formatDate(ts) {
 }
 
 export default function ProgressPage() {
-  const { progress, level, stagesCleared, rank, reset } = useProgress()
+  const { progress, stagesCleared, rank, reset } = useProgress()
 
   const answeredEntries = Object.entries(progress.answers)
   const answered = answeredEntries.length
@@ -35,10 +35,15 @@ export default function ProgressPage() {
         <div className="growth-info">
           <div className="growth-rank">{rank.title}</div>
           <div className="growth-progress-label">
-            Lv.{level.level}・{level.xp} pt ／ 単元クリア {stagesCleared} / {domains.length}
+            単元クリア {stagesCleared} / {domains.length}
           </div>
           <div className="xp-bar" style={{ marginTop: 6 }}>
-            <span style={{ width: `${level.pct}%` }} />
+            <span
+              style={{
+                width: `${Math.round((stagesCleared / domains.length) * 100)}%`,
+                background: rank.ring,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -77,8 +82,10 @@ export default function ProgressPage() {
           <div className="label">最高連続学習日数</div>
         </div>
         <div className="stat">
-          <div className="num">{progress.maxCombo}</div>
-          <div className="label">最大連続正解</div>
+          <div className="num">
+            {stagesCleared}/{domains.length}
+          </div>
+          <div className="label">クリア単元</div>
         </div>
       </div>
 
@@ -123,14 +130,14 @@ export default function ProgressPage() {
         })}
       </div>
 
-      {/* 演習履歴 */}
-      <h2 className="section-title">演習履歴</h2>
+      {/* テスト履歴 */}
+      <h2 className="section-title">テスト履歴</h2>
       {progress.sessions.length === 0 ? (
         <div className="empty">
-          まだ演習記録がありません。
+          まだ単元テストの記録がありません。
           <br />
-          <Link className="btn gold" style={{ marginTop: 16 }} to="/quiz">
-            問題演習を始める
+          <Link className="btn gold" style={{ marginTop: 16 }} to="/">
+            学習を始める
           </Link>
         </div>
       ) : (

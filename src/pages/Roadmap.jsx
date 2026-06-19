@@ -53,8 +53,8 @@ export default function Roadmap() {
         <Link className="btn gold" to="/">
           学習マップで始める
         </Link>
-        <Link className="btn secondary" to="/study">
-          学習教材
+        <Link className="btn secondary" to="/flashcards">
+          フラッシュカード
         </Link>
       </div>
     </div>

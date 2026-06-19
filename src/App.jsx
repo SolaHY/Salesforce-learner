@@ -3,40 +3,34 @@ import { ProgressProvider, useProgress } from './hooks/useProgress'
 import Toaster from './components/Toaster'
 import Avatar from './components/Avatar'
 import Dashboard from './pages/Dashboard'
-import Quiz from './pages/Quiz'
+import UnitFlow from './pages/UnitFlow'
+import Exam from './pages/Exam'
 import Flashcards from './pages/Flashcards'
-import Study from './pages/Study'
 import ProgressPage from './pages/ProgressPage'
 import Roadmap from './pages/Roadmap'
-import LearningPortal from './pages/LearningPortal'
 
 const navItems = [
   { to: '/', label: '学習マップ', icon: '◈', end: true },
   { to: '/roadmap', label: 'ロードマップ', icon: '◇' },
-  { to: '/quiz', label: '問題演習', icon: '▤' },
   { to: '/flashcards', label: 'フラッシュカード', icon: '▢' },
-  { to: '/study', label: '学習教材', icon: '▥' },
   { to: '/progress', label: '進捗・実績', icon: '▦' },
-  { to: '/portal', label: '学習ポータル', icon: '◎' },
 ]
 
 function HeroPanel() {
-  const { level, stagesCleared, rank } = useProgress()
+  const { stagesCleared, rank } = useProgress()
+  const total = 7
+  const pct = Math.round((stagesCleared / total) * 100)
   return (
     <div className="hero-panel">
       <div className="hero-top">
         <Avatar stage={stagesCleared} size={56} />
         <div>
           <div className="hero-rank">{rank.title}</div>
-          <div className="hero-sub">単元クリア {stagesCleared} / 7</div>
+          <div className="hero-sub">単元クリア {stagesCleared} / {total}</div>
         </div>
       </div>
       <div className="xp-bar">
-        <span style={{ width: `${level.pct}%` }} />
-      </div>
-      <div className="xp-meta">
-        <span>Lv.{level.level}・{level.xp} pt</span>
-        <span>次まで {level.toNext}</span>
+        <span style={{ width: `${pct}%`, background: rank.ring }} />
       </div>
     </div>
   )
@@ -73,13 +67,10 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/roadmap" element={<Roadmap />} />
-          <Route path="/quiz" element={<Quiz />} />
-          <Route path="/quiz/:domainId" element={<Quiz />} />
+          <Route path="/unit/:domainId" element={<UnitFlow />} />
+          <Route path="/exam" element={<Exam />} />
           <Route path="/flashcards" element={<Flashcards />} />
-          <Route path="/study" element={<Study />} />
-          <Route path="/study/:domainId" element={<Study />} />
           <Route path="/progress" element={<ProgressPage />} />
-          <Route path="/portal" element={<LearningPortal />} />
         </Routes>
       </main>
       <Toaster />

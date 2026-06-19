@@ -2,7 +2,7 @@ import { createContext, useContext, useCallback, useMemo, useState, useRef } fro
 import { useLocalStorage } from './useLocalStorage'
 import { questions } from '../data/quizzes'
 import { flashcards } from '../data/flashcards'
-import { BADGES, XP, levelInfo, stagesClearedCount, avatarRank } from '../data/gamification'
+import { BADGES, stagesClearedCount, avatarRank } from '../data/gamification'
 
 const STORAGE_KEY = 'sf-learner-progress-v2'
 
@@ -10,9 +10,7 @@ const emptyProgress = {
   answers: {}, // questionId -> { correct, attempts, lastAt }
   sessions: [], // 演習履歴
   reviewedCards: [], // 復習済みカード id
-  xp: 0,
   badges: [], // 解放済みバッジ id
-  maxCombo: 0, // 最大連続正解数
   streak: { count: 0, best: 0, lastDate: null }, // 連続学習日数
 }
 
@@ -58,7 +56,6 @@ export function ProgressProvider({ children }) {
   const applyUpdate = useCallback(
     (mutate, { touchStreak = true } = {}) => {
       const before = normalize(stored)
-      const beforeLevel = levelInfo(before.xp).level
       const beforeStages = stagesClearedCount(before)
       const next = mutate({ ...before })
 
@@ -98,10 +95,6 @@ export function ProgressProvider({ children }) {
           desc: `新しい称号：${avatarRank(afterStages).title}`,
         })
       }
-      const afterLevel = levelInfo(next.xp).level
-      if (afterLevel > beforeLevel) {
-        pushToast({ type: 'levelup', title: `レベルアップ！ Lv.${afterLevel}`, desc: '経験値が貯まりました' })
-      }
       newlyUnlocked.forEach((b) =>
         pushToast({ type: 'badge', title: `バッジ獲得：${b.name}`, desc: b.desc, icon: b.icon }),
       )
@@ -112,8 +105,7 @@ export function ProgressProvider({ children }) {
   )
 
   const recordAnswer = useCallback(
-    (questionId, isCorrect, combo = 0) => {
-      const gained = isCorrect ? XP.CORRECT : XP.WRONG
+    (questionId, isCorrect) => {
       applyUpdate((draft) => {
         const prevEntry = draft.answers[questionId] || { attempts: 0 }
         draft.answers = {
@@ -124,29 +116,20 @@ export function ProgressProvider({ children }) {
             lastAt: Date.now(),
           },
         }
-        draft.xp += gained
-        draft.maxCombo = Math.max(draft.maxCombo || 0, combo)
         return draft
       })
-      pushToast({ type: 'xp', title: `+${gained} pt`, desc: isCorrect ? '正解' : '回答' })
     },
-    [applyUpdate, pushToast],
+    [applyUpdate],
   )
 
   const recordSession = useCallback(
     (session) => {
-      const bonus =
-        session.score * XP.SESSION_PER_CORRECT +
-        (session.total > 0 && session.score === session.total ? XP.PERFECT_BONUS : 0)
       applyUpdate((draft) => {
         draft.sessions = [{ ...session, at: Date.now() }, ...draft.sessions].slice(0, 50)
-        draft.xp += bonus
         return draft
       })
-      if (bonus > 0)
-        pushToast({ type: 'xp', title: `クリアボーナス +${bonus} pt`, desc: '演習クリア' })
     },
-    [applyUpdate, pushToast],
+    [applyUpdate],
   )
 
   const toggleReviewed = useCallback(
@@ -158,16 +141,13 @@ export function ProgressProvider({ children }) {
             draft.reviewedCards = draft.reviewedCards.filter((id) => id !== cardId)
           } else {
             draft.reviewedCards = [...draft.reviewedCards, cardId]
-            draft.xp += XP.CARD_REVIEW
           }
           return draft
         },
         { touchStreak: !wasReviewed },
       )
-      if (!wasReviewed)
-        pushToast({ type: 'xp', title: `+${XP.CARD_REVIEW} pt`, desc: 'カードを習得' })
     },
-    [applyUpdate, progress.reviewedCards, pushToast],
+    [applyUpdate, progress.reviewedCards],
   )
 
   const reset = useCallback(() => setStored(emptyProgress), [setStored])
@@ -176,7 +156,6 @@ export function ProgressProvider({ children }) {
   const value = useMemo(
     () => ({
       progress,
-      level: levelInfo(progress.xp),
       stagesCleared,
       rank: avatarRank(stagesCleared),
       recordAnswer,

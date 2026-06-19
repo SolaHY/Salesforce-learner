@@ -1,6 +1,6 @@
 import { useProgress } from '../hooks/useProgress'
 
-const ICONS = { xp: '✨', levelup: '⬆️', badge: '🏅', evolve: '🎉' }
+const ICONS = { badge: '🏅', evolve: '🎉' }
 
 export default function Toaster() {
   const { toasts } = useProgress()
