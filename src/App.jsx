@@ -1,10 +1,12 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { ProgressProvider, useProgress } from './hooks/useProgress'
+import { domains } from './data/domains'
 import Toaster from './components/Toaster'
 import Avatar from './components/Avatar'
 import Dashboard from './pages/Dashboard'
 import UnitFlow from './pages/UnitFlow'
 import Exam from './pages/Exam'
+import MockExams from './pages/MockExams'
 import Flashcards from './pages/Flashcards'
 import ProgressPage from './pages/ProgressPage'
 import Roadmap from './pages/Roadmap'
@@ -12,13 +14,14 @@ import Roadmap from './pages/Roadmap'
 const navItems = [
   { to: '/', label: '学習マップ', icon: '◈', end: true },
   { to: '/roadmap', label: 'ロードマップ', icon: '◇' },
+  { to: '/mock', label: '模擬試験', icon: '◎' },
   { to: '/flashcards', label: 'フラッシュカード', icon: '▢' },
   { to: '/progress', label: '進捗・実績', icon: '▦' },
 ]
 
 function HeroPanel() {
   const { stagesCleared, rank } = useProgress()
-  const total = 7
+  const total = domains.length
   const pct = Math.round((stagesCleared / total) * 100)
   return (
     <div className="hero-panel">
@@ -69,6 +72,8 @@ function Shell() {
           <Route path="/roadmap" element={<Roadmap />} />
           <Route path="/unit/:domainId" element={<UnitFlow />} />
           <Route path="/exam" element={<Exam />} />
+          <Route path="/mock" element={<MockExams />} />
+          <Route path="/mock/:mockId" element={<MockExams />} />
           <Route path="/flashcards" element={<Flashcards />} />
           <Route path="/progress" element={<ProgressPage />} />
         </Routes>

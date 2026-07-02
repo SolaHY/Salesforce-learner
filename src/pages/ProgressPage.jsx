@@ -51,7 +51,7 @@ export default function ProgressPage() {
       {/* 成長の記録（アバター進化ギャラリー） */}
       <h2 className="section-title">成長の記録</h2>
       <p className="page-sub" style={{ marginTop: 4 }}>
-        単元をクリアするたびにキャラクターが成長します。（{stagesCleared} / 7 段階）
+        単元をクリアするたびにキャラクターが成長します。（{stagesCleared} / {domains.length} 段階）
       </p>
       <div className="evolution-row">
         {AVATAR_RANKS.map((r, i) => {
@@ -144,9 +144,10 @@ export default function ProgressPage() {
         <div className="card" style={{ marginTop: 12 }}>
           {progress.sessions.map((s, i) => {
             const label =
-              s.domainId === 'all'
+              s.label ??
+              (s.domainId === 'all'
                 ? '全範囲'
-                : domains.find((d) => d.id === s.domainId)?.name ?? s.domainId
+                : domains.find((d) => d.id === s.domainId)?.name ?? s.domainId)
             const pct = Math.round((s.score / s.total) * 100)
             return (
               <div

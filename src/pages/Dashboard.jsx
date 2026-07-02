@@ -24,7 +24,7 @@ export default function Dashboard() {
     <div>
       <h1 className="page-title">学習マップ</h1>
       <p className="page-sub">
-        7つの単元を順に攻略していきましょう。各単元は「インプット →
+        {domains.length}つの単元を順に攻略していきましょう。各単元は「インプット →
         簡単クイズ → 深堀インプット → 応用クイズ → 単元テスト」の流れで進み、単元テストで70%以上を取るとクリア・次の単元が解放されます。
       </p>
 
@@ -113,7 +113,7 @@ export default function Dashboard() {
                   修了試験に挑戦
                 </Link>
               ) : (
-                <span className="status-locked">全7単元をクリアすると解放されます</span>
+                <span className="status-locked">全{domains.length}単元をクリアすると解放されます</span>
               )}
             </div>
           </div>
@@ -123,6 +123,9 @@ export default function Dashboard() {
       <div className="toolbar" style={{ marginTop: 26, justifyContent: 'center' }}>
         <Link className="btn secondary" to="/roadmap">
           学習ロードマップを見る
+        </Link>
+        <Link className="btn secondary" to="/mock">
+          模擬試験に挑戦
         </Link>
         <Link className="btn secondary" to="/flashcards">
           フラッシュカード

@@ -72,6 +72,36 @@ export const flashcards = [
     front: 'AppExchange とは？',
     back: 'Salesforce の公式マーケットプレイス。サードパーティ製アプリ、Lightningコンポーネント、フロー、コンサルサービスを入手できる。',
   },
+  {
+    id: 'fc-13',
+    domain: 'agentforce',
+    front: 'Agentforce とは？',
+    back: 'CRMデータと業務に根ざした自律型AIエージェントを構築・運用するSalesforceのAI基盤。Einstein Copilot から進化。Atlas Reasoning Engine が意図理解→計画→実行を推論する。',
+  },
+  {
+    id: 'fc-14',
+    domain: 'agentforce',
+    front: 'トピック(Topic)とアクション(Action)の違いは？',
+    back: 'トピック=エージェントが扱う業務範囲の単位（指示・スコープ）。アクション=エージェントが実行する具体的操作。アクションには標準のほか Flow・Apex・プロンプトテンプレートを利用できる。',
+  },
+  {
+    id: 'fc-15',
+    domain: 'agentforce',
+    front: 'Einstein Trust Layer とは？',
+    back: '生成AIを安全に使うための信頼レイヤー。データマスキング、ゼロデータ保持（外部LLMに保持させない）、監査ログ、毒性検出などを提供する。',
+  },
+  {
+    id: 'fc-16',
+    domain: 'agentforce',
+    front: 'Prompt Builder とグラウンディング',
+    back: 'Prompt Builder=生成AI用プロンプトテンプレート（Sales Email・項目生成・Flex等）を作成するツール。グラウンディング=レコードやData Cloud等のデータを与え回答の正確性を高める（根拠付け）。',
+  },
+  {
+    id: 'fc-17',
+    domain: 'agentforce',
+    front: 'Agent / Copilot / 従来型Bot の違い',
+    back: 'Agent=自律的に計画・実行するエージェント。Copilot/Assistant=対話でユーザーを補助。従来型Bot=決め打ちシナリオで応答。Agentforce は自律エージェントを構築する。',
+  },
 ]
 
 export const flashcardsByDomain = (domainId) =>

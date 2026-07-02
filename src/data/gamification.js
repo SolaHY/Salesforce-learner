@@ -12,12 +12,12 @@ export function isStageCleared(progress, domainId) {
 export function allStagesCleared(progress) {
   return domains.every((d) => isStageCleared(progress, d.id))
 }
-// クリア済みステージ数（= アバターの成長段階 0〜7）
+// クリア済みステージ数（= アバターの成長段階 0〜8）
 export function stagesClearedCount(progress) {
   return domains.filter((d) => isStageCleared(progress, d.id)).length
 }
 
-// アバターの成長段階。index = クリア済みステージ数 (0〜7)。
+// アバターの成長段階。index = クリア済みステージ数 (0〜8)。
 // 単元をクリアするたびに段階が上がり、肩書きと見た目（リング色）が変化する。
 export const AVATAR_RANKS = [
   { title: '見習い', ring: '#64748b' },
@@ -27,6 +27,7 @@ export const AVATAR_RANKS = [
   { title: 'シニアアドミン', ring: '#2b9bff' },
   { title: 'リードアドミン', ring: '#7c8cff' },
   { title: 'エキスパート', ring: '#b06bff' },
+  { title: 'AIスペシャリスト', ring: '#16b8a6' },
   { title: '認定アドミニストレーター', ring: '#ffcf5a' },
 ]
 export function avatarRank(stagesCleared) {
@@ -109,7 +110,7 @@ export const BADGES = [
     id: 'map-conqueror',
     icon: '👑',
     name: '全単元制覇',
-    desc: '全7単元をクリアした',
+    desc: '全8単元をクリアした',
     check: (p) => allStagesCleared(p),
   },
 ]

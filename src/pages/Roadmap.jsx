@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { roadmap } from '../data/roadmap'
+import { roadmap, resources } from '../data/roadmap'
 import { domains } from '../data/domains'
 import { useProgress } from '../hooks/useProgress'
 import { isStageCleared } from '../data/gamification'
@@ -49,9 +49,32 @@ export default function Roadmap() {
         ))}
       </div>
 
+      <h2 className="section-title" style={{ marginTop: 32 }}>参考リンク（公式 Trailhead ほか）</h2>
+      <p className="page-sub" style={{ marginTop: 4 }}>
+        本アプリと併用したい外部の学習リソース。最新の試験ガイドは必ず公式ページで確認してください。
+      </p>
+      <div className="grid" style={{ marginTop: 12 }}>
+        {resources.map((r) => (
+          <a
+            key={r.url}
+            className="card"
+            href={r.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ padding: 16, textDecoration: 'none', color: 'inherit', display: 'block' }}
+          >
+            <strong style={{ fontSize: 14 }}>{r.title} ↗</strong>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--muted)' }}>{r.note}</p>
+          </a>
+        ))}
+      </div>
+
       <div className="toolbar" style={{ marginTop: 26, justifyContent: 'center' }}>
         <Link className="btn gold" to="/">
           学習マップで始める
+        </Link>
+        <Link className="btn secondary" to="/mock">
+          模擬試験
         </Link>
         <Link className="btn secondary" to="/flashcards">
           フラッシュカード

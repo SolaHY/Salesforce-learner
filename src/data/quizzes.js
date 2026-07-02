@@ -16,6 +16,7 @@ import { serviceSupportQuestions } from './questions/serviceSupport'
 import { productivityQuestions } from './questions/productivity'
 import { dataAnalyticsQuestions } from './questions/dataAnalytics'
 import { automationQuestions } from './questions/automation'
+import { agentforceQuestions } from './questions/agentforce'
 
 export const questions = [
   ...configSetupQuestions,
@@ -25,6 +26,7 @@ export const questions = [
   ...productivityQuestions,
   ...dataAnalyticsQuestions,
   ...automationQuestions,
+  ...agentforceQuestions,
 ]
 
 // 正解インデックスの配列を返すヘルパー

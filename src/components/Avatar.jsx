@@ -1,6 +1,6 @@
 import { AVATAR_RANKS } from '../data/gamification'
 
-// 単元クリア数 (stage 0〜7) に応じて見た目が成長する人物アバター。
+// 単元クリア数 (stage 0〜8) に応じて見た目が成長する人物アバター。
 // 上位段階ほど装い（眼鏡→襟→ジャケット→ネクタイ→ヘッドセット→社章→認定スター）が増える。
 export default function Avatar({ stage = 0, size = 96, glow = false }) {
   const s = Math.max(0, Math.min(AVATAR_RANKS.length - 1, stage))
@@ -73,8 +73,8 @@ export default function Avatar({ stage = 0, size = 96, glow = false }) {
         )}
       </g>
 
-      {/* 認定スター (s>=7) */}
-      {s >= 7 && (
+      {/* 認定スター (最終段階=認定アドミニストレーターのみ) */}
+      {s >= 8 && (
         <g transform="translate(74,24)">
           <circle r="11" fill={ring} />
           <path

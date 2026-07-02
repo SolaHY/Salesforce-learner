@@ -137,8 +137,49 @@ export const studyMaterials = {
       },
     ],
   },
+  agentforce: {
+    intro:
+      'Salesforce の自律型AIエージェント基盤。Einstein Copilot から進化した最新のAI領域（配点8%）。管理者は「何を・どこまで」エージェントに任せるかを設定する。',
+    sections: [
+      {
+        heading: 'Agentforce の全体像',
+        points: [
+          'Agentforce = CRM データと業務に根ざした自律型AIエージェントを構築・運用する基盤。',
+          'エージェントの種類: サービス（顧客対応）、営業支援、社内向け（Employee）など用途別。',
+          'Atlas Reasoning Engine が「意図の理解 → 計画 → 実行」を推論して自律的に処理する。',
+          'Agent（自律実行）／Copilot・Assistant（対話補助）／従来型Bot（決め打ちシナリオ）の違いを区別する。',
+        ],
+      },
+      {
+        heading: 'Agent Builder：トピックとアクション',
+        points: [
+          'トピック(Topic): エージェントが扱う業務範囲の単位。指示・スコープ・利用アクションを定義。',
+          'アクション(Action): エージェントが実際に実行する操作。標準アクションのほか Flow・Apex・プロンプトテンプレートをアクション化できる。',
+          '管理者は許可するトピック/アクションを絞ってガードレール（安全策）を設定する。',
+          'Testing Center でテスト後にデプロイし、稼働状況をモニタリングする。',
+        ],
+      },
+      {
+        heading: 'Prompt Builder と Einstein Trust Layer',
+        points: [
+          'Prompt Builder: 生成AI用のプロンプトテンプレート（Sales Email・項目生成・Flex 等）を作成し、CRMデータでグラウンディング（根拠付け）する。',
+          'グラウンディング: レコードや Data Cloud、ナレッジのデータを与えて回答の正確性を高める（RAG）。',
+          'Einstein Trust Layer: データマスキング、ゼロデータ保持（プロンプト/応答を外部LLMに保持させない）、監査ログ、毒性検出などで安全性を担保。',
+          '有効化には Einstein 生成AIの有効化・Agentforce ライセンス・権限セットの割り当てが必要。',
+        ],
+      },
+      {
+        heading: '配置とチャネル',
+        points: [
+          'エージェントは Experience Cloud サイト、Service Console、Slack、モバイルなど複数チャネルに配置できる。',
+          'サービスエージェントは Web チャットやメッセージングで顧客対応を自動化する。',
+          '生成AI機能の例: ケース要約(Work Summaries)、返信文の生成、メール下書き作成。',
+        ],
+      },
+    ],
+  },
   automation: {
-    intro: '宣言的な自動化ツール。配点16%。Flow が現在の主役。',
+    intro: '宣言的な自動化ツール。配点15%。Flow が現在の主役。',
     sections: [
       {
         heading: '自動化ツールの選択',
