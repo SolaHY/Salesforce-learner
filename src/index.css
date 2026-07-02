@@ -957,6 +957,27 @@ nav {
   font-size: 14.5px;
   color: var(--text);
 }
+.study-figure {
+  margin: 4px 0 16px;
+  padding: 16px 14px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.study-figure svg {
+  display: block;
+  width: 100%;
+  max-width: 620px;
+  height: auto;
+  margin: 0 auto;
+}
+.study-figure figcaption {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
 .study-section ul {
   margin: 0;
   padding-left: 22px;

@@ -8,6 +8,7 @@ import { useProgress } from '../hooks/useProgress'
 import { scoreRank, STAGE_CLEAR_PCT } from '../data/gamification'
 import QuizRunner from '../components/QuizRunner'
 import Confetti from '../components/Confetti'
+import Figure from '../components/Figure'
 
 const STEPS = [
   { key: 'input', label: 'インプット', short: '基礎' },
@@ -50,6 +51,7 @@ function Sections({ sections }) {
         <div className="study-section" key={section.heading}>
           <h3>{section.heading}</h3>
           {section.body && <p className="study-body">{section.body}</p>}
+          {section.figure && <Figure name={section.figure} />}
           {section.points?.length > 0 && (
             <ul>
               {section.points.map((p, i) => (
