@@ -36,7 +36,31 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      # 成功した試行の URL を採用（|| は先頭の真値を返す）
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url }}
     steps:
-      - id: deployment
+      # GitHub Pages 側の一時的エラー（Deployment failed, try again later）対策として自動リトライする。
+      # 最初の 2 回は失敗しても続行し、最後の試行で成否を確定させる。
+      - name: Deploy（試行1）
+        id: deploy1
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: リトライ前の待機
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 30
+
+      - name: Deploy（試行2）
+        id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: リトライ前の待機
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 60
+
+      - name: Deploy（試行3・最終）
+        id: deploy3
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
