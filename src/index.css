@@ -951,6 +951,12 @@ nav {
   margin: 0 0 12px;
   color: var(--blue-deep);
 }
+.study-body {
+  margin: 0 0 12px;
+  line-height: 1.9;
+  font-size: 14.5px;
+  color: var(--text);
+}
 .study-section ul {
   margin: 0;
   padding-left: 22px;

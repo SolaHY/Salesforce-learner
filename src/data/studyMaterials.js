@@ -1,203 +1,26 @@
-// 各ドメインの学習まとめ（マークダウン風の簡易構造）。
-// sections: { heading, points: [] }
+// 各ドメインの学習教材（読んで理解できる詳細版）。
+// スキーマ: { intro, sections: [{ heading, body, points: [] }] }
+//   intro   : 領域の位置づけ・配点（インプット冒頭に表示）
+//   sections: 前半 = インプット(基礎)、後半 = 深堀インプット(応用) として自動分割される
+//   body    : セクションの地の文解説（任意）
+//   points  : 詳細な箇条書き（各項目は完結した説明文）
+// 内容量が多いためドメインごとにファイル分割している（src/data/study/*.js）。
+import { dataAnalyticsStudy } from './study/dataAnalytics'
+import { configSetupStudy } from './study/configSetup'
+import { objectManagerStudy } from './study/objectManager'
+import { automationStudy } from './study/automation'
+import { salesMarketingStudy } from './study/salesMarketing'
+import { serviceSupportStudy } from './study/serviceSupport'
+import { productivityStudy } from './study/productivity'
+import { agentforceStudy } from './study/agentforce'
+
 export const studyMaterials = {
-  'config-setup': {
-    intro:
-      '組織全体の設定・会社情報・UI・ユーザー管理・セキュリティの基礎を扱う、最も配点の高い領域の一つ。',
-    sections: [
-      {
-        heading: '会社・組織設定',
-        points: [
-          '会社情報: 既定の通貨、ロケール、タイムゾーン、ライセンス数を確認できる。',
-          'ビジネス時間と休日: ケースのエスカレーションやSLAの計算基準になる。',
-          'Fiscal Year（会計年度）: 標準会計年度とカスタム会計年度。',
-        ],
-      },
-      {
-        heading: 'ユーザー管理',
-        points: [
-          'ユーザー作成にはプロファイルとユーザーライセンスが必須。',
-          '凍結(Freeze)はライセンスを解放しないが、無効化(Deactivate)はライセンスを解放する。',
-          'ユーザーは削除できない。無効化して対応する。',
-        ],
-      },
-      {
-        heading: 'セキュリティの階層',
-        points: [
-          '組織レベル: ログインIP範囲、ログイン時間、パスワードポリシー、MFA。',
-          'オブジェクトレベル: プロファイル/権限セットのCRUD権限。',
-          '項目レベル: 項目レベルセキュリティ(FLS)。',
-          'レコードレベル: OWD、ロール階層、共有ルール、手動共有。',
-          '権限セットはプロファイルに権限を「追加」するもので、剥奪はできない。',
-        ],
-      },
-    ],
-  },
-  'object-manager': {
-    intro:
-      'オブジェクト・項目・関係・ページレイアウト・Lightning アプリビルダーを扱う。配点20%の重要領域。',
-    sections: [
-      {
-        heading: 'オブジェクトと関係',
-        points: [
-          '主従関係: 親削除で子も削除、共有/所有を継承、積み上げ集計が可能。',
-          '参照関係: 疎結合、親削除でも子は残る、積み上げ集計は不可。',
-          '多対多: 2つの主従関係を持つ「ジャンクションオブジェクト」で実現。',
-        ],
-      },
-      {
-        heading: '項目タイプ',
-        points: [
-          '数式項目: 読み取り専用、保存時/参照時に計算。',
-          '積み上げ集計: 主従の親で子のCOUNT/SUM/MIN/MAX。',
-          '自動採番、選択リスト（グローバル値セットで共有可能）。',
-        ],
-      },
-      {
-        heading: 'UIのカスタマイズ',
-        points: [
-          'ページレイアウト: 項目配置、関連リスト、ボタンをプロファイル/レコードタイプ別に割当。',
-          'Lightningレコードページ: アプリビルダーでコンポーネント配置、表示ルールで出し分け。',
-          'コンパクトレイアウト: モバイルやハイライトパネルの主要項目。',
-        ],
-      },
-    ],
-  },
-  'sales-marketing': {
-    intro: 'リード・取引先・商談・価格表・キャンペーンなど営業/マーケ機能。',
-    sections: [
-      {
-        heading: 'リードと商談',
-        points: [
-          'リード変換で取引先・取引先責任者・商談を生成。',
-          '商談ステージはレコードタイプ＋販売プロセスで制御。',
-          '商談に紐づく価格表(Price Book)と商品(Product)。',
-        ],
-      },
-      {
-        heading: 'キャンペーン',
-        points: [
-          'キャンペーンメンバー（リード/取引先責任者）と状況管理。',
-          'キャンペーンの影響(Campaign Influence)で商談へのROIを測定。',
-        ],
-      },
-    ],
-  },
-  'service-support': {
-    intro: 'ケース管理を中心としたカスタマーサポート機能。',
-    sections: [
-      {
-        heading: 'ケースの自動化',
-        points: [
-          '割り当てルール: 新規ケースの担当者/キューを決定。',
-          '自動応答ルール: 顧客への自動返信。',
-          'エスカレーションルール: 時間経過で再割当・通知。',
-        ],
-      },
-      {
-        heading: 'チャネル',
-        points: [
-          'Email-to-Case / Web-to-Case で外部からケースを生成。',
-          'ナレッジ(Knowledge)で記事を管理しケース解決に活用。',
-        ],
-      },
-    ],
-  },
-  productivity: {
-    intro: 'Chatter・モバイル・活動・AppExchange などの生産性機能。',
-    sections: [
-      {
-        heading: 'コラボレーション',
-        points: [
-          'Chatter: フィード、グループ、フォロー、メンション。',
-          '活動(Activity): ToDo（タスク）とイベント（予定）。',
-          'AppExchange: 拡張アプリ/コンポーネントのマーケットプレイス。',
-        ],
-      },
-    ],
-  },
-  'data-analytics': {
-    intro: 'データ管理（インポート/エクスポート/品質）とレポート/ダッシュボード。',
-    sections: [
-      {
-        heading: 'データ管理',
-        points: [
-          'インポートウィザード(最大5万件) と データローダ(最大500万件)。',
-          '重複管理: 一致ルール + 重複ルール。',
-          'データエクスポート（週次/月次バックアップ）。',
-        ],
-      },
-      {
-        heading: 'レポート/ダッシュボード',
-        points: [
-          'レポートタイプ: 表形式/サマリー/マトリックス/結合。',
-          'ダッシュボードは実行ユーザーの権限で表示（動的ダッシュボードで閲覧者基準に）。',
-          'バケット項目、集計式、クロスフィルタ。',
-        ],
-      },
-    ],
-  },
-  agentforce: {
-    intro:
-      'Salesforce の自律型AIエージェント基盤。Einstein Copilot から進化した最新のAI領域（配点8%）。管理者は「何を・どこまで」エージェントに任せるかを設定する。',
-    sections: [
-      {
-        heading: 'Agentforce の全体像',
-        points: [
-          'Agentforce = CRM データと業務に根ざした自律型AIエージェントを構築・運用する基盤。',
-          'エージェントの種類: サービス（顧客対応）、営業支援、社内向け（Employee）など用途別。',
-          'Atlas Reasoning Engine が「意図の理解 → 計画 → 実行」を推論して自律的に処理する。',
-          'Agent（自律実行）／Copilot・Assistant（対話補助）／従来型Bot（決め打ちシナリオ）の違いを区別する。',
-        ],
-      },
-      {
-        heading: 'Agent Builder：トピックとアクション',
-        points: [
-          'トピック(Topic): エージェントが扱う業務範囲の単位。指示・スコープ・利用アクションを定義。',
-          'アクション(Action): エージェントが実際に実行する操作。標準アクションのほか Flow・Apex・プロンプトテンプレートをアクション化できる。',
-          '管理者は許可するトピック/アクションを絞ってガードレール（安全策）を設定する。',
-          'Testing Center でテスト後にデプロイし、稼働状況をモニタリングする。',
-        ],
-      },
-      {
-        heading: 'Prompt Builder と Einstein Trust Layer',
-        points: [
-          'Prompt Builder: 生成AI用のプロンプトテンプレート（Sales Email・項目生成・Flex 等）を作成し、CRMデータでグラウンディング（根拠付け）する。',
-          'グラウンディング: レコードや Data Cloud、ナレッジのデータを与えて回答の正確性を高める（RAG）。',
-          'Einstein Trust Layer: データマスキング、ゼロデータ保持（プロンプト/応答を外部LLMに保持させない）、監査ログ、毒性検出などで安全性を担保。',
-          '有効化には Einstein 生成AIの有効化・Agentforce ライセンス・権限セットの割り当てが必要。',
-        ],
-      },
-      {
-        heading: '配置とチャネル',
-        points: [
-          'エージェントは Experience Cloud サイト、Service Console、Slack、モバイルなど複数チャネルに配置できる。',
-          'サービスエージェントは Web チャットやメッセージングで顧客対応を自動化する。',
-          '生成AI機能の例: ケース要約(Work Summaries)、返信文の生成、メール下書き作成。',
-        ],
-      },
-    ],
-  },
-  automation: {
-    intro: '宣言的な自動化ツール。配点15%。Flow が現在の主役。',
-    sections: [
-      {
-        heading: '自動化ツールの選択',
-        points: [
-          '入力規則: 保存をブロックしてデータ品質を担保。',
-          'Flow: 現在推奨の主要ツール。画面/レコードトリガー/スケジュール等。',
-          'ワークフロールール・プロセスビルダーは廃止予定（Flowへ移行）。',
-          '承認プロセス: 多段階の承認ワークフロー。',
-        ],
-      },
-      {
-        heading: 'Flow の種類',
-        points: [
-          '画面フロー: ユーザー操作を伴うガイド付き処理。',
-          'レコードトリガーフロー: 作成/更新/削除時に自動実行（before/after）。',
-          'スケジュールフロー: 指定時刻にバッチ的に実行。',
-        ],
-      },
-    ],
-  },
+  'data-analytics': dataAnalyticsStudy,
+  'config-setup': configSetupStudy,
+  'object-manager': objectManagerStudy,
+  automation: automationStudy,
+  'sales-marketing': salesMarketingStudy,
+  'service-support': serviceSupportStudy,
+  productivity: productivityStudy,
+  agentforce: agentforceStudy,
 }

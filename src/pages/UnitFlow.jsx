@@ -49,11 +49,14 @@ function Sections({ sections }) {
       {sections.map((section) => (
         <div className="study-section" key={section.heading}>
           <h3>{section.heading}</h3>
-          <ul>
-            {section.points.map((p, i) => (
-              <li key={i}>{p}</li>
-            ))}
-          </ul>
+          {section.body && <p className="study-body">{section.body}</p>}
+          {section.points?.length > 0 && (
+            <ul>
+              {section.points.map((p, i) => (
+                <li key={i}>{p}</li>
+              ))}
+            </ul>
+          )}
         </div>
       ))}
     </>
