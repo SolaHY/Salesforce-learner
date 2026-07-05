@@ -32,12 +32,18 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
   const [selected, setSelected] = useState([])
   const [submitted, setSubmitted] = useState(false)
   const [score, setScore] = useState(0)
-  // 選択肢をシャッフルした出題デッキ。問題セットが変わったら作り直して最初から。
+  // 採点・記録済みの問題ID（選び直しても二重採点しないため）。
+  const [scored, setScored] = useState(() => new Set())
+  // 選択肢をシャッフルした出題デッキ。
   const [deck, setDeck] = useState(() => shuffleDeck(questions))
-  const [deckSource, setDeckSource] = useState(questions)
-  if (questions !== deckSource) {
-    setDeckSource(questions)
+  // 問題セットが変わったかは参照ではなく問題IDの並びで判定する。
+  // （親が毎レンダリングで配列を作り直しても、中身が同じならリセットしない）
+  const sig = questions.map((q) => q.id).join('|')
+  const [deckSig, setDeckSig] = useState(sig)
+  if (sig !== deckSig) {
+    setDeckSig(sig)
     setDeck(shuffleDeck(questions))
+    setScored(new Set())
     setIndex(0)
     setSelected([])
     setSubmitted(false)
@@ -64,8 +70,18 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
     if (!selected.length) return
     const ok = setsEqual(selected, answerIdx)
     setSubmitted(true)
-    if (ok) setScore((s) => s + 1)
-    if (recordAnswers) recordAnswer(current.id, ok)
+    // 採点・進捗記録は各問「最初の回答」のみ。選び直しは学習用で成績には影響しない。
+    if (!scored.has(current.id)) {
+      setScored((prev) => new Set(prev).add(current.id))
+      if (ok) setScore((s) => s + 1)
+      if (recordAnswers) recordAnswer(current.id, ok)
+    }
+  }
+
+  // 不正解のとき、同じ問題をもう一度選び直せるようにする。
+  function retry() {
+    setSubmitted(false)
+    setSelected([])
   }
 
   function next() {
@@ -139,20 +155,32 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
           <div className={`explanation ${correct ? 'ok' : 'ng'}`}>
             <strong>{correct ? '正解' : '不正解'}</strong>
             <p style={{ margin: '8px 0 0' }}>{current.explanation}</p>
+            {!correct && (
+              <p style={{ margin: '8px 0 0', opacity: 0.85 }}>
+                「選び直す」でこの問題にもう一度挑戦できます（成績は最初の回答で確定します）。
+              </p>
+            )}
           </div>
           {current.reference && <div className="reference">{current.reference}</div>}
         </>
       )}
 
-      <div className="quiz-actions" style={{ justifyContent: 'flex-end' }}>
+      <div className="quiz-actions" style={{ justifyContent: 'flex-end', gap: 10 }}>
         {!submitted ? (
           <button className="btn" onClick={submit} disabled={!selected.length}>
             回答する
           </button>
         ) : (
-          <button className="btn gold" onClick={next}>
-            {index + 1 >= deck.length ? nextLabel : '次の問題へ'}
-          </button>
+          <>
+            {!correct && (
+              <button className="btn" onClick={retry}>
+                選び直す
+              </button>
+            )}
+            <button className="btn gold" onClick={next}>
+              {index + 1 >= deck.length ? nextLabel : '次の問題へ'}
+            </button>
+          </>
         )}
       </div>
     </div>
