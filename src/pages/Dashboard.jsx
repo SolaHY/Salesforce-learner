@@ -2,22 +2,20 @@ import { Link } from 'react-router-dom'
 import { domains } from '../data/domains'
 import { questions } from '../data/quizzes'
 import { useProgress } from '../hooks/useProgress'
-import { isStageCleared, allStagesCleared, avatarRank, AVATAR_RANKS } from '../data/gamification'
+import { isStageCleared, avatarRank, AVATAR_RANKS } from '../data/gamification'
 import Avatar from '../components/Avatar'
 
 export default function Dashboard() {
   const { progress, stagesCleared, rank } = useProgress()
 
-  let prevCleared = true // 最初の単元は常に挑戦可能
+  // すべての単元を開放：前の単元のクリア状況に関わらず、常に挑戦可能
   const stages = domains.map((d) => {
     const cleared = isStageCleared(progress, d.id)
-    const unlocked = prevCleared
-    const state = cleared ? 'clear' : unlocked ? 'open' : 'locked'
-    prevCleared = cleared
+    const state = cleared ? 'clear' : 'open'
     return { domain: d, state }
   })
 
-  const finalUnlocked = allStagesCleared(progress)
+  const finalUnlocked = true // 修了試験も常に開放
   const nextRank = AVATAR_RANKS[Math.min(stagesCleared + 1, AVATAR_RANKS.length - 1)]
 
   return (
