@@ -29,8 +29,7 @@ function Stepper({ current, onJump }) {
           <button
             key={s.key}
             className={`flow-step ${state}`}
-            onClick={() => i <= current && onJump(i)}
-            disabled={i > current}
+            onClick={() => onJump(i)}
           >
             <span className="flow-step-dot">{i < current ? '✓' : i + 1}</span>
             <span className="flow-step-text">
