@@ -25,7 +25,7 @@ function MockList() {
     <div>
       <h1 className="page-title">模擬試験</h1>
       <p className="page-sub">
-        本番想定の {mockExams[0].total} 問構成を全 {mockExams.length} 回分用意しました。出題は公式の配点比率どおりにドメインをミックスしています。合格ラインは {PASS_PCT}% です。
+        ADM-201 の実試験対策問題（japanitstudy / jpnshiken）から全 {mockExams.reduce((s, mk) => s + mk.total, 0)} 問を収録し、本番想定の約 {mockExams[0].total} 問ずつ全 {mockExams.length} 回分に構成しました。各回はドメインをバランスよくミックスしています。合格ラインは {PASS_PCT}% です。
       </p>
 
       <div className="grid" style={{ marginTop: 16 }}>
