@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { mockExams, mockById, PASS_PCT } from '../data/mockExams'
+import { mockExams, mockById, PASS_PCT, OFFICIAL_COUNT, SIMILAR_COUNT } from '../data/mockExams'
 import { useProgress } from '../hooks/useProgress'
 import { scoreRank } from '../data/gamification'
 import QuizRunner from '../components/QuizRunner'
@@ -25,7 +25,7 @@ function MockList() {
     <div>
       <h1 className="page-title">模擬試験</h1>
       <p className="page-sub">
-        ADM-201 の実試験対策問題（japanitstudy / jpnshiken）から全 {mockExams.reduce((s, mk) => s + mk.total, 0)} 問を収録し、本番想定の約 {mockExams[0].total} 問ずつ全 {mockExams.length} 回分に構成しました。各回はドメインをバランスよくミックスしています。合格ラインは {PASS_PCT}% です。
+        公式プラクティステストと同一の {OFFICIAL_COUNT} 問、その類似問題 {SIMILAR_COUNT} 問、実試験対策問題（japanitstudy / jpnshiken）を合わせた全 {mockExams.reduce((s, mk) => s + mk.total, 0)} 問を、本番想定の約 {mockExams[0].total} 問ずつ全 {mockExams.length} 回分に構成しました。各回はドメインと出典をバランスよくミックスしています。合格ラインは {PASS_PCT}% です。
       </p>
 
       <div className="grid" style={{ marginTop: 16 }}>
@@ -37,7 +37,7 @@ function MockList() {
                 <h3 style={{ margin: 0 }}>{mk.title}</h3>
                 <span className="weight-pill">全 {mk.total} 問</span>
               </div>
-              <div style={{ margin: '10px 0 14px', fontSize: 13, color: 'var(--muted)' }}>
+              <div style={{ margin: '10px 0 14px', fontSize: 13, color: 'var(--muted)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {best != null ? (
                   <span style={{ color: best >= PASS_PCT ? 'var(--green)' : 'var(--orange)' }}>
                     最高スコア {best}%{best >= PASS_PCT ? '（合格ライン突破）' : ''}
@@ -45,13 +45,14 @@ function MockList() {
                 ) : (
                   <span>未受験</span>
                 )}
+                {mk.officialCount > 0 && <span>公式問題 {mk.officialCount} 問</span>}
               </div>
               <div className="mock-bars" style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', marginBottom: 14 }}>
                 {mk.composition.map((c) => (
                   <span
                     key={c.id}
                     title={`${c.name}：${c.count}問`}
-                    style={{ width: `${c.count}%`, background: c.color }}
+                    style={{ width: `${(c.count / mk.total) * 100}%`, background: c.color }}
                   />
                 ))}
               </div>

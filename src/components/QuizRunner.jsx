@@ -101,6 +101,8 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
       <div className="quiz-progress">
         <span>
           問題 {index + 1} / {deck.length}
+          {current.source === 'official' && <span className="source-pill">公式問題</span>}
+          {current.source === 'similar' && <span className="source-pill alt">類似問題</span>}
         </span>
         <span>正解 {score}</span>
       </div>

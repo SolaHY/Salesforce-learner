@@ -718,6 +718,24 @@ nav {
   color: var(--muted);
   margin-bottom: 8px;
 }
+/* 出典バッジ（公式問題 / 類似問題） */
+.source-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--blue, #00a1e0);
+  background: rgba(0, 161, 224, 0.1);
+  border: 1px solid rgba(0, 161, 224, 0.32);
+}
+.source-pill.alt {
+  color: var(--purple, #7f56d9);
+  background: rgba(127, 86, 217, 0.1);
+  border-color: rgba(127, 86, 217, 0.3);
+}
 .battle-bar {
   height: 6px;
   border-radius: 999px;
