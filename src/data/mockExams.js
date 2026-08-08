@@ -7,8 +7,11 @@
 //        - jpnshiken.com（ADM-201 過去問 2024-11 / 2026-04）
 // 3 系統を均等に織り込んだうえでドメインを均等分散させ、本番想定の約 60 問ずつに分割する。
 // 決定論的に構成するので、リロードしても同じ回は同じ問題セットになる。
+// さらに、出典がひとまとまりの追加模試（extraMockQuestions・全 8 分野ミックス 60 問）を
+// 最終回として末尾に固定で追加する。分割対象のプールには混ぜないため、既存の回の問題構成は変わらない。
 import { mockQuestions } from './mockQuestions'
 import { officialQuestions, similarQuestions } from './officialQuestions'
+import { extraMockQuestions } from './extraMockExam'
 import { domains } from './domains'
 
 export const MOCK_SIZE = 60 // 1 回あたりの問題数（本番想定）
@@ -44,6 +47,25 @@ function balancedOrder(list) {
 
 const ordered = balancedOrder(pool)
 
+// 問題リストから 1 回分の模試オブジェクトを組み立てる（ドメイン内訳・公式問題数を付与）。
+function buildMock({ id, title, items, tag }) {
+  const counts = {}
+  for (const q of items) counts[q.domain] = (counts[q.domain] || 0) + 1
+  const composition = domains
+    .filter((d) => counts[d.id])
+    .map((d) => ({ id: d.id, name: d.name, color: d.color, count: counts[d.id] }))
+  return {
+    id,
+    title,
+    tag,
+    questions: items,
+    total: items.length,
+    composition,
+    // 公式問題と同一の問題が何問含まれるか（一覧のバッジ用）
+    officialCount: items.filter((q) => q.source === 'official').length,
+  }
+}
+
 // 約 MOCK_SIZE 問ずつに分割して模試を構成する。
 // 端数だけの極端に短い回ができないよう、全回をほぼ均等な問題数に振り分ける。
 function buildMocks() {
@@ -58,28 +80,25 @@ function buildMocks() {
     const size = base + (m < extra ? 1 : 0)
     const items = ordered.slice(cursor, cursor + size)
     cursor += size
-    // ドメイン別の内訳（構成バー用）
-    const counts = {}
-    for (const q of items) counts[q.domain] = (counts[q.domain] || 0) + 1
-    const composition = domains
-      .filter((d) => counts[d.id])
-      .map((d) => ({ id: d.id, name: d.name, color: d.color, count: counts[d.id] }))
-    mocks.push({
-      id: m + 1,
-      title: `模試 ${m + 1}`,
-      questions: items,
-      total: items.length,
-      composition,
-      // 公式問題と同一の問題が何問含まれるか（一覧のバッジ用）
-      officialCount: items.filter((q) => q.source === 'official').length,
-    })
+    mocks.push(buildMock({ id: m + 1, title: `模試 ${m + 1}`, items }))
   }
   return mocks
 }
 
-export const mockExams = buildMocks()
+const generatedMocks = buildMocks()
+
+// 追加模試（全 8 分野ミックス 60 問）を最終回として末尾に固定する。
+const extraMock = buildMock({
+  id: generatedMocks.length + 1,
+  title: `模試 ${generatedMocks.length + 1}`,
+  items: extraMockQuestions,
+  tag: '全分野ミックス',
+})
+
+export const mockExams = [...generatedMocks, extraMock]
 export const MOCK_COUNT = mockExams.length
 export const OFFICIAL_COUNT = officialQuestions.length
 export const SIMILAR_COUNT = similarQuestions.length
+export const EXTRA_COUNT = extraMockQuestions.length
 
 export const mockById = (id) => mockExams.find((mk) => String(mk.id) === String(id))
