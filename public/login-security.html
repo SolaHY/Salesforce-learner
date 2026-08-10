@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Salesforce のログインとアクセス制御を図解。パスワードポリシー、プロファイルのログインIP範囲と組織の信頼済みIP範囲の違い、ログイン時間制限、MFA・セキュリティトークン、セッション設定まで。" />
+<title>Salesforce ログインとアクセス制御 図解</title>
+<style>
+/* ============================================================
+   トークン：ライトを既定にし、system(未指定) と明示 dark の両方を上書きする
+   色の意味 — 紫=プロファイル単位 / 藍緑=組織全体 / 緑=許可 / 赤=拒否 / 琥珀=追加の本人確認
+   ============================================================ */
+:root {
+  --paper: #ffffff;
+  --ground: #f3f4f9;
+  --ground-2: #e9ebf3;
+  --line: #dee0ea;
+  --line-soft: #eaecf3;
+  --ink: #14161f;
+  --ink-2: #3b3f4d;
+  --muted: #5f6474;
+
+  --user: #1b6fe0;        /* ユーザ・認証情報 */
+  --user-bg: #e8f1fd;
+  --profile: #7549cf;     /* プロファイル単位の設定 */
+  --profile-bg: #f0eafc;
+  --org: #0d7183;         /* 組織全体の設定 */
+  --org-bg: #e2f2f4;
+  --allow: #16794c;       /* 許可・そのまま通す */
+  --allow-bg: #e4f3ea;
+  --verify: #a25c00;      /* 追加の本人確認 */
+  --verify-bg: #fdf1de;
+  --block: #c0332e;       /* 拒否・ブロック */
+  --block-bg: #fdeceb;
+
+  --shadow: 0 1px 2px rgba(20, 22, 31, .05), 0 10px 28px -18px rgba(20, 22, 31, .35);
+  --sans: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #171a26;
+    --ground: #0e1018;
+    --ground-2: #1d2130;
+    --line: #2c3142;
+    --line-soft: #232839;
+    --ink: #eff1f7;
+    --ink-2: #c4c8d6;
+    --muted: #8e93a6;
+
+    --user:    #62a6f7;  --user-bg:    #14263c;
+    --profile: #b18ef0;  --profile-bg: #241d3a;
+    --org:     #4bbccf;  --org-bg:     #102a2f;
+    --allow:   #45bd84;  --allow-bg:   #102c22;
+    --verify:  #e0a44a;  --verify-bg:  #2e2314;
+    --block:   #f0736c;  --block-bg:   #331a1a;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 30px -20px rgba(0, 0, 0, .9);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #171a26;
+  --ground: #0e1018;
+  --ground-2: #1d2130;
+  --line: #2c3142;
+  --line-soft: #232839;
+  --ink: #eff1f7;
+  --ink-2: #c4c8d6;
+  --muted: #8e93a6;
+
+  --user:    #62a6f7;  --user-bg:    #14263c;
+  --profile: #b18ef0;  --profile-bg: #241d3a;
+  --org:     #4bbccf;  --org-bg:     #102a2f;
+  --allow:   #45bd84;  --allow-bg:   #102c22;
+  --verify:  #e0a44a;  --verify-bg:  #2e2314;
+  --block:   #f0736c;  --block-bg:   #331a1a;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 30px -20px rgba(0, 0, 0, .9);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.9;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+   レイアウト
+   ============================================================ */
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
+.col { max-width: 74ch; }
+
+/* ---- ヘッダー ---- */
+.hero { padding: 64px 0 36px; border-bottom: 1px solid var(--line); }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+h1 {
+  font-size: clamp(30px, 4.4vw, 46px);
+  line-height: 1.28;
+  letter-spacing: -.02em;
+  font-weight: 700;
+  margin: 0 0 18px;
+  text-wrap: balance;
+}
+h1 .accent { color: var(--user); }
+h1 .accent-2 { color: var(--block); }
+.lede { font-size: 17px; color: var(--ink-2); margin: 0; max-width: 68ch; }
+
+/* 凡例：このページの色の意味 */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 30px 0 0;
+  padding: 14px 16px;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  padding-right: 12px;
+}
+.legend .sw {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--hue);
+  flex: 0 0 auto;
+}
+.legend b { color: var(--hue); font-weight: 700; }
+
+/* ---- ナビ ---- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.nav-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 10px 24px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav-inner::-webkit-scrollbar { display: none; }
+.nav a {
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  text-decoration: none;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 5px 13px;
+  white-space: nowrap;
+  transition: border-color .15s, color .15s;
+}
+.nav a:hover { color: var(--ink); border-color: var(--muted); }
+.nav a:focus-visible, a:focus-visible { outline: 2px solid var(--user); outline-offset: 2px; }
+.nav a .i { font-family: var(--mono); color: var(--muted); margin-right: 6px; }
+
+/* ---- セクション ---- */
+section { padding-top: 56px; scroll-margin-top: 62px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; border-top: 2px solid var(--ink); padding-top: 14px; }
+.sec-head .num {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--muted);
+  padding-top: 6px;
+}
+h2 {
+  font-size: clamp(21px, 2.6vw, 27px);
+  line-height: 1.45;
+  letter-spacing: -.01em;
+  margin: 0;
+  font-weight: 700;
+  text-wrap: balance;
+}
+h3 {
+  font-size: 17px;
+  margin: 34px 0 10px;
+  letter-spacing: -.005em;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+h3::before {
+  content: "";
+  width: 4px;
+  height: 17px;
+  border-radius: 2px;
+  background: var(--hue, var(--muted));
+  flex: 0 0 auto;
+}
+p { margin: 12px 0; }
+.sec-lede { color: var(--ink-2); margin-top: 14px; }
+code, .mono { font-family: var(--mono); font-size: .88em; font-variant-numeric: tabular-nums; }
+code {
+  background: var(--ground-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* ---- 図版 ---- */
+figure {
+  margin: 24px 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.fig-scroll { overflow-x: auto; padding: 20px 20px 8px; }
+figure svg { display: block; width: 100%; height: auto; }
+figcaption {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 10px 20px 16px;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 8px;
+  line-height: 1.75;
+}
+figcaption b { color: var(--ink-2); font-weight: 700; }
+svg text { font-family: var(--sans); }
+svg .m { font-family: var(--mono); }
+
+/* ---- 表 ---- */
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: var(--shadow); margin: 18px 0; }
+table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 14px; }
+caption { text-align: left; font-size: 12.5px; color: var(--muted); padding: 12px 16px 0; }
+th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; line-height: 1.7; }
+thead th { font-size: 12.5px; color: var(--muted); font-weight: 700; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
+thead th.c-p { color: var(--profile); }
+thead th.c-o { color: var(--org); }
+tbody th { font-weight: 700; width: 28%; color: var(--ink); }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; }
+td .num, th .num, td .def { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td .def {
+  font-size: 11.5px;
+  color: var(--allow);
+  background: var(--allow-bg);
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+/* ---- カード群 ---- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 14px; margin: 18px 0; }
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--hue, var(--muted));
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.card h4 { margin: 0 0 6px; font-size: 14.5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.8; }
+.card .tag {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 6px;
+  color: var(--muted);
+}
+
+/* ---- 注意ボックス ---- */
+.note {
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 18px 0;
+  font-size: 14px;
+  line-height: 1.85;
+  border: 1px solid color-mix(in srgb, var(--hue, var(--muted)) 32%, transparent);
+  background: var(--hue-bg, var(--ground-2));
+}
+.note .label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--hue, var(--muted));
+  font-weight: 700;
+  display: block;
+  margin-bottom: 4px;
+}
+.note.verify { --hue: var(--verify); --hue-bg: var(--verify-bg); }
+.note.block { --hue: var(--block); --hue-bg: var(--block-bg); }
+.note.org { --hue: var(--org); --hue-bg: var(--org-bg); }
+.note.profile { --hue: var(--profile); --hue-bg: var(--profile-bg); }
+
+/* ---- 手順（縦のタイムライン） ---- */
+.steps { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 0; counter-reset: s; }
+.steps li {
+  counter-increment: s;
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  column-gap: 16px;
+  padding: 0 0 22px;
+}
+.steps li::before {
+  content: counter(s, decimal-leading-zero);
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+  z-index: 1;
+  width: 34px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--hue, var(--muted));
+  background: var(--hue-bg, var(--ground-2));
+  border: 1px solid color-mix(in srgb, var(--hue, var(--muted)) 30%, transparent);
+  border-radius: 8px;
+}
+.steps li::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 32px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--line);
+}
+.steps li:last-child::after { display: none; }
+.steps.p { --hue: var(--profile); --hue-bg: var(--profile-bg); }
+.steps.o { --hue: var(--org); --hue-bg: var(--org-bg); }
+.steps li b { grid-column: 2; font-size: 15px; line-height: 1.75; letter-spacing: -.005em; }
+.steps li span {
+  grid-column: 2;
+  display: block;
+  margin-top: 2px;
+  max-width: 64ch;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.9;
+}
+
+/* ---- チェックリスト ---- */
+.check { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 8px; max-width: 78ch; }
+.check li { position: relative; padding-left: 28px; font-size: 14px; line-height: 1.85; }
+.check li::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 11px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--hue, var(--org));
+  transform: rotate(45deg);
+}
+
+/* ---- 試験ポイント ---- */
+.points { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.points li {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.points li .k { font-family: var(--mono); font-size: 11.5px; color: var(--muted); padding-top: 4px; font-variant-numeric: tabular-nums; }
+.points li em { font-style: normal; font-weight: 700; color: var(--verify); }
+
+footer {
+  margin-top: 72px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.9;
+}
+footer a { color: var(--user); }
+
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px 72px; }
+  .nav-inner { padding: 8px 16px; }
+  .hero { padding-top: 40px; }
+  body { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="セクション">
+  <div class="nav-inner">
+    <a href="#gates"><span class="i">01</span>ログインの関門</a>
+    <a href="#password"><span class="i">02</span>パスワードポリシー</a>
+    <a href="#ip"><span class="i">03</span>2種類のIP設定</a>
+    <a href="#hours"><span class="i">04</span>ログイン時間制限</a>
+    <a href="#mfa"><span class="i">05</span>本人確認・MFA・トークン</a>
+    <a href="#session"><span class="i">06</span>セッション設定</a>
+    <a href="#ops"><span class="i">07</span>運用と切り分け</a>
+    <a href="#exam"><span class="i">08</span>試験ポイント</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">Salesforce Certified Administrator ／ 設定とセットアップ・セキュリティ</p>
+    <h1>ログインと<span class="accent">アクセス制御</span>／<span class="accent-2">通す条件と弾く条件</span></h1>
+    <p class="lede">
+      「ログインできない」の原因は、たいてい設定場所が違うだけの似た機能が並んでいることにあります。
+      このページは <strong>どこで設定するか（プロファイル単位か、組織全体か）</strong> と
+      <strong>引っかかったらどうなるか（拒否されるのか、本人確認で済むのか）</strong> の 2 軸で全体を並べ直したものです。
+    </p>
+
+    <ul class="legend">
+      <li style="--hue: var(--profile)"><span class="sw"></span><b>紫</b>＝プロファイル単位の設定</li>
+      <li style="--hue: var(--org)"><span class="sw"></span><b>藍緑</b>＝組織全体の設定</li>
+      <li style="--hue: var(--allow)"><span class="sw"></span><b>緑</b>＝そのまま通す</li>
+      <li style="--hue: var(--verify)"><span class="sw"></span><b>琥珀</b>＝追加の本人確認が要る</li>
+      <li style="--hue: var(--block)"><span class="sw"></span><b>赤</b>＝拒否・ブロック</li>
+    </ul>
+  </header>
+
+  <!-- ============================ 01 ============================ -->
+  <section id="gates">
+    <div class="sec-head"><span class="num">01</span><h2>全体像 — ログイン 1 回で通過する 7 つの関門</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        ユーザがログインボタンを押してから画面が開くまでに、7 つのチェックが順番に走ります。
+        重要なのは、それぞれ<strong>設定する場所が違う</strong>ことと、<strong>失敗したときの結果が「拒否」と「追加の本人確認」の 2 種類</strong>あることです。
+        トラブルの切り分けは、この順番のどこで止まったかを特定する作業になります。
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 620" role="img" aria-labelledby="fig1t fig1d">
+          <title id="fig1t">ログイン時に順番に評価される 7 つの関門</title>
+          <desc id="fig1d">認証情報、ロックアウト、プロファイルのログインIP範囲、ログイン時間、組織の信頼済みIP範囲、多要素認証、セッション設定の順に評価される。IP範囲と時間は範囲外なら拒否、信頼済みIP範囲外なら本人確認が追加される。</desc>
+
+          <defs>
+            <marker id="g-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--muted)" />
+            </marker>
+          </defs>
+
+          <!-- 列見出し -->
+          <g class="m" font-size="11" letter-spacing="1.4" fill="var(--muted)">
+            <text x="70" y="20">関門</text>
+            <text x="452" y="20">設定場所</text>
+            <text x="726" y="20">条件に合わないとき</text>
+          </g>
+          <line x1="16" y1="30" x2="1024" y2="30" stroke="var(--line)" />
+
+          <!-- 縦のスパイン -->
+          <line x1="34" y1="52" x2="34" y2="576" stroke="var(--line)" stroke-width="2" />
+
+          <!-- 1 -->
+          <g>
+            <circle cx="34" cy="66" r="13" fill="var(--user-bg)" stroke="var(--user)" stroke-width="2" />
+            <text x="34" y="70" class="m" font-size="11" font-weight="700" fill="var(--user)" text-anchor="middle">1</text>
+            <text x="70" y="62" font-size="14.5" font-weight="700" fill="var(--ink)">ユーザ名とパスワード</text>
+            <text x="70" y="82" font-size="12.5" fill="var(--muted)">パスワードポリシーの複雑さ・有効期限を満たしているか</text>
+            <rect x="452" y="46" width="188" height="28" rx="7" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="546" y="65" font-size="12" fill="var(--org)" text-anchor="middle">組織全体＋プロファイル</text>
+            <rect x="726" y="46" width="298" height="28" rx="7" fill="var(--block-bg)" stroke="var(--block)" />
+            <text x="742" y="65" font-size="12" fill="var(--block)">拒否（無効なパスワード／期限切れは再設定へ）</text>
+          </g>
+
+          <!-- 2 -->
+          <g>
+            <circle cx="34" cy="146" r="13" fill="var(--user-bg)" stroke="var(--user)" stroke-width="2" />
+            <text x="34" y="150" class="m" font-size="11" font-weight="700" fill="var(--user)" text-anchor="middle">2</text>
+            <text x="70" y="142" font-size="14.5" font-weight="700" fill="var(--ink)">ロックアウト判定</text>
+            <text x="70" y="162" font-size="12.5" fill="var(--muted)">ログイン失敗回数がしきい値を超えていないか</text>
+            <rect x="452" y="126" width="188" height="28" rx="7" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="546" y="145" font-size="12" fill="var(--org)" text-anchor="middle">パスワードポリシー</text>
+            <rect x="726" y="126" width="298" height="28" rx="7" fill="var(--block-bg)" stroke="var(--block)" />
+            <text x="742" y="145" font-size="12" fill="var(--block)">拒否（有効期間の経過か管理者の解除まで）</text>
+          </g>
+
+          <!-- 3 -->
+          <g>
+            <circle cx="34" cy="226" r="13" fill="var(--profile-bg)" stroke="var(--profile)" stroke-width="2" />
+            <text x="34" y="230" class="m" font-size="11" font-weight="700" fill="var(--profile)" text-anchor="middle">3</text>
+            <text x="70" y="222" font-size="14.5" font-weight="700" fill="var(--ink)">ログイン IP アドレスの制限</text>
+            <text x="70" y="242" font-size="12.5" fill="var(--muted)">接続元 IP がプロファイルの許可範囲に入っているか</text>
+            <rect x="452" y="206" width="188" height="28" rx="7" fill="var(--profile-bg)" stroke="var(--profile)" />
+            <text x="546" y="225" font-size="12" fill="var(--profile)" text-anchor="middle">プロファイル</text>
+            <rect x="726" y="206" width="298" height="28" rx="7" fill="var(--block-bg)" stroke="var(--block)" stroke-width="1.8" />
+            <text x="742" y="225" font-size="12" font-weight="700" fill="var(--block)">拒否（例外なし。API もブラウザも通らない）</text>
+          </g>
+
+          <!-- 4 -->
+          <g>
+            <circle cx="34" cy="306" r="13" fill="var(--profile-bg)" stroke="var(--profile)" stroke-width="2" />
+            <text x="34" y="310" class="m" font-size="11" font-weight="700" fill="var(--profile)" text-anchor="middle">4</text>
+            <text x="70" y="302" font-size="14.5" font-weight="700" fill="var(--ink)">ログイン時間帯</text>
+            <text x="70" y="322" font-size="12.5" fill="var(--muted)">曜日ごとの許可時間内か（組織の既定タイムゾーンで判定）</text>
+            <rect x="452" y="286" width="188" height="28" rx="7" fill="var(--profile-bg)" stroke="var(--profile)" />
+            <text x="546" y="305" font-size="12" fill="var(--profile)" text-anchor="middle">プロファイル</text>
+            <rect x="726" y="286" width="298" height="28" rx="7" fill="var(--block-bg)" stroke="var(--block)" />
+            <text x="742" y="305" font-size="12" fill="var(--block)">拒否（ログイン中なら以降の操作ができなくなる）</text>
+          </g>
+
+          <!-- 5 -->
+          <g>
+            <circle cx="34" cy="386" r="13" fill="var(--org-bg)" stroke="var(--org)" stroke-width="2" />
+            <text x="34" y="390" class="m" font-size="11" font-weight="700" fill="var(--org)" text-anchor="middle">5</text>
+            <text x="70" y="382" font-size="14.5" font-weight="700" fill="var(--ink)">信頼済み IP 範囲（ネットワークアクセス）</text>
+            <text x="70" y="402" font-size="12.5" fill="var(--muted)">社内ネットワークなど、本人確認を省略してよい接続元か</text>
+            <rect x="452" y="366" width="188" height="28" rx="7" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="546" y="385" font-size="12" fill="var(--org)" text-anchor="middle">組織全体</text>
+            <rect x="726" y="366" width="298" height="28" rx="7" fill="var(--verify-bg)" stroke="var(--verify)" stroke-width="1.8" />
+            <text x="742" y="385" font-size="12" font-weight="700" fill="var(--verify)">拒否ではなく、本人確認コードが要求される</text>
+          </g>
+
+          <!-- 6 -->
+          <g>
+            <circle cx="34" cy="466" r="13" fill="var(--verify-bg)" stroke="var(--verify)" stroke-width="2" />
+            <text x="34" y="470" class="m" font-size="11" font-weight="700" fill="var(--verify)" text-anchor="middle">6</text>
+            <text x="70" y="462" font-size="14.5" font-weight="700" fill="var(--ink)">多要素認証（MFA）</text>
+            <text x="70" y="482" font-size="12.5" fill="var(--muted)">認証アプリやセキュリティキーによる 2 つ目の要素</text>
+            <rect x="452" y="446" width="188" height="28" rx="7" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="546" y="465" font-size="12" fill="var(--org)" text-anchor="middle">組織全体＋権限</text>
+            <rect x="726" y="446" width="298" height="28" rx="7" fill="var(--verify-bg)" stroke="var(--verify)" />
+            <text x="742" y="465" font-size="12" fill="var(--verify)">要素を提示できるまでログインは完了しない</text>
+          </g>
+
+          <!-- 7 -->
+          <g>
+            <circle cx="34" cy="546" r="13" fill="var(--allow-bg)" stroke="var(--allow)" stroke-width="2" />
+            <text x="34" y="550" class="m" font-size="11" font-weight="700" fill="var(--allow)" text-anchor="middle">7</text>
+            <text x="70" y="542" font-size="14.5" font-weight="700" fill="var(--ink)">セッションの確立</text>
+            <text x="70" y="562" font-size="12.5" fill="var(--muted)">タイムアウト値・IP ロック・HTTPS 必須などが適用される</text>
+            <rect x="452" y="526" width="188" height="28" rx="7" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="546" y="545" font-size="12" fill="var(--org)" text-anchor="middle">セッションの設定</text>
+            <rect x="726" y="526" width="298" height="28" rx="7" fill="var(--allow-bg)" stroke="var(--allow)" />
+            <text x="742" y="545" font-size="12" fill="var(--allow)">ログイン成功。以後はセッションの寿命の話になる</text>
+          </g>
+
+          <!-- 進行方向 -->
+          <path d="M34 590 V604" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#g-arrow)" />
+          <text x="56" y="604" font-size="11.5" fill="var(--muted)">上から順に評価。どこかで止まればそこが原因</text>
+        </svg>
+      </div>
+      <figcaption>
+        図 1 ／ 関門 <b>3・4 はプロファイル単位</b>（紫）で、外れると<b>問答無用で拒否</b>。関門 <b>5 は組織全体</b>（藍緑）で、外れても<b>拒否ではなく本人確認が増えるだけ</b>。
+        この「紫は弾く／藍緑は確かめる」という性格の違いが、以降のすべての判断の土台になります。
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================ 02 ============================ -->
+  <section id="password">
+    <div class="sec-head"><span class="num">02</span><h2>パスワードポリシー — 組織全体とプロファイルの二層構造</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        パスワードポリシーは <strong>［設定］→「セキュリティ」→「パスワードポリシー」</strong> で組織全体の既定値を決め、
+        <strong>プロファイルごとに個別の値で上書き</strong>できます。厳しくしたい部門だけ別プロファイルにする、という運用がとれるのはこのためです。
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>表 1 ／ パスワードポリシーの主な設定項目（<span class="def">既定</span> は標準の初期値）</caption>
+        <thead>
+          <tr>
+            <th scope="col">設定項目</th>
+            <th scope="col">選べる値</th>
+            <th scope="col">意味と注意点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">パスワードの有効期限</th>
+            <td><span class="num">30 / 60 / 90 / 180 / 365</span> 日、期限なし<span class="def">90日</span></td>
+            <td>期限が切れると次回ログイン時に強制的に再設定させられる。「パスワード無期限」権限を持つユーザは対象外。</td>
+          </tr>
+          <tr>
+            <th scope="row">パスワード履歴の保存</th>
+            <td><span class="num">1〜24</span> 個、保存しない<span class="def">3個</span></td>
+            <td>直近の何個分を再利用禁止にするか。有効期限を設定している場合は「保存しない」を選べない。</td>
+          </tr>
+          <tr>
+            <th scope="row">パスワードの最小文字数</th>
+            <td><span class="num">5 / 8 / 10 / 12</span> 文字<span class="def">8文字</span></td>
+            <td>短く設定できてしまうため、実務では 10 文字以上にすることが多い。</td>
+          </tr>
+          <tr>
+            <th scope="row">パスワードの複雑さの要件</th>
+            <td>なし／英字と数字を含む／英数字と特殊文字を含む／数字と大文字と小文字を含む／数字・大文字・小文字・特殊文字を含む<span class="def">英字と数字</span></td>
+            <td>文字種の組み合わせを強制する。厳しくするほどヘルプデスクへの問い合わせは増えるため段階的に。</td>
+          </tr>
+          <tr>
+            <th scope="row">パスワードの質問の要件</th>
+            <td>なし／答えにパスワードを含めない<span class="def">含めない</span></td>
+            <td>本人確認用の秘密の質問に、パスワードそのものを書かせないための制約。</td>
+          </tr>
+          <tr>
+            <th scope="row">ログイン試行の最大許容回数</th>
+            <td>制限なし／<span class="num">3 / 5 / 10</span> 回<span class="def">10回</span></td>
+            <td>連続失敗でユーザをロックアウトする回数。総当たり攻撃への基本的な対策。</td>
+          </tr>
+          <tr>
+            <th scope="row">ロックアウトの有効期間</th>
+            <td><span class="num">15 / 30 / 60</span> 分、管理者が解除するまで<span class="def">15分</span></td>
+            <td>「管理者が解除するまで」を選ぶと、ユーザ詳細画面の［ロック解除］が必要になる。</td>
+          </tr>
+          <tr>
+            <th scope="row">パスワードのヒント／リセットのメッセージ</th>
+            <td>任意のテキスト・URL</td>
+            <td>ロック時の案内文や社内ヘルプデスクの連絡先を出せる。運用の問い合わせを減らす地味に効く設定。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 300" role="img" aria-labelledby="fig2t fig2d">
+          <title id="fig2t">ログイン失敗からロックアウト解除までの流れ</title>
+          <desc id="fig2d">ログイン失敗が続くとしきい値でロックアウトされ、ロックアウトの有効期間の経過または管理者のロック解除でログインできるようになる。</desc>
+
+          <defs>
+            <marker id="p-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--block)" />
+            </marker>
+            <marker id="p-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--allow)" />
+            </marker>
+          </defs>
+
+          <text x="16" y="24" class="m" font-size="11" letter-spacing="1.6" fill="var(--muted)">LOCKOUT — 失敗から復帰まで</text>
+
+          <!-- 失敗カウント -->
+          <g>
+            <rect x="16" y="56" width="300" height="86" rx="10" fill="var(--paper)" stroke="var(--line)" />
+            <text x="36" y="84" font-size="14" font-weight="700" fill="var(--ink)">ログイン失敗が続く</text>
+            <g>
+              <rect x="36" y="98" width="34" height="28" rx="6" fill="var(--block-bg)" stroke="var(--block)" />
+              <text x="53" y="117" class="m" font-size="12" fill="var(--block)" text-anchor="middle">1</text>
+              <rect x="78" y="98" width="34" height="28" rx="6" fill="var(--block-bg)" stroke="var(--block)" />
+              <text x="95" y="117" class="m" font-size="12" fill="var(--block)" text-anchor="middle">2</text>
+              <rect x="120" y="98" width="34" height="28" rx="6" fill="var(--block-bg)" stroke="var(--block)" />
+              <text x="137" y="117" class="m" font-size="12" fill="var(--block)" text-anchor="middle">3</text>
+              <text x="166" y="117" font-size="12.5" fill="var(--muted)">… 最大許容回数まで</text>
+            </g>
+          </g>
+          <path d="M316 99 H358" stroke="var(--block)" stroke-width="2" marker-end="url(#p-arrow)" />
+
+          <!-- ロック -->
+          <g>
+            <rect x="366" y="56" width="270" height="86" rx="10" fill="var(--block-bg)" stroke="var(--block)" stroke-width="1.8" />
+            <text x="386" y="84" font-size="14" font-weight="700" fill="var(--block)">アカウントがロックされる</text>
+            <text x="386" y="106" font-size="12.5" fill="var(--ink-2)">正しいパスワードでも入れない</text>
+            <text x="386" y="126" font-size="12.5" fill="var(--muted)">ログイン履歴には失敗理由が残る</text>
+          </g>
+
+          <!-- 解除 2 ルート -->
+          <path d="M636 86 H686 V70 H736" stroke="var(--allow)" stroke-width="2" fill="none" marker-end="url(#p-arrow-a)" />
+          <path d="M636 112 H686 V186 H736" stroke="var(--allow)" stroke-width="2" fill="none" marker-end="url(#p-arrow-a)" />
+
+          <g>
+            <rect x="744" y="46" width="280" height="52" rx="10" fill="var(--allow-bg)" stroke="var(--allow)" />
+            <text x="764" y="70" font-size="13.5" font-weight="700" fill="var(--allow)">有効期間の経過で自動解除</text>
+            <text x="764" y="88" font-size="12" fill="var(--ink-2)">15 / 30 / 60 分のいずれかを設定している場合</text>
+          </g>
+          <g>
+            <rect x="744" y="160" width="280" height="52" rx="10" fill="var(--allow-bg)" stroke="var(--allow)" />
+            <text x="764" y="184" font-size="13.5" font-weight="700" fill="var(--allow)">管理者が［ロック解除］</text>
+            <text x="764" y="202" font-size="12" fill="var(--ink-2)">「管理者が解除するまで」を設定している場合</text>
+          </g>
+
+          <!-- 補足 -->
+          <rect x="16" y="238" width="1008" height="46" rx="10" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="36" y="258" font-size="12.5" fill="var(--ink-2)">ロック解除とパスワードのリセットは別の操作。ロック解除は「入れるようにする」だけで、パスワードは変わらない。</text>
+          <text x="36" y="276" font-size="12.5" fill="var(--ink-2)">管理者はユーザ一覧から複数ユーザのパスワードを一括リセットでき、対象者にはリセット用のメールが届く。</text>
+        </svg>
+      </div>
+      <figcaption>
+        図 2 ／ <b>ロックアウトの有効期間</b>の設定次第で、復帰の経路が「時間で自動」か「管理者の手動」かに分かれます。
+        試験では「ユーザがロックされた。管理者は何をするか」という形で問われます。
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================ 03 ============================ -->
+  <section id="ip">
+    <div class="sec-head"><span class="num">03</span><h2>IP アドレスの 2 つの顔 — 「弾く制限」と「確かめない範囲」</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        このドメインで最も間違えやすいのがここです。IP に関する設定は名前が似た 2 つがあり、<strong>目的も設定場所も結果もまったく違います</strong>。
+        <strong>プロファイルの「ログイン IP アドレスの制限」は範囲外を拒否する門番</strong>、
+        <strong>組織全体の「信頼済み IP 範囲」は本人確認を省略してよい相手のリスト</strong>です。
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>表 2 ／ ログイン IP アドレスの制限と信頼済み IP 範囲の比較</caption>
+        <thead>
+          <tr>
+            <th scope="col">観点</th>
+            <th scope="col" class="c-p">ログイン IP アドレスの制限</th>
+            <th scope="col" class="c-o">信頼済み IP 範囲（ネットワークアクセス）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">設定場所</th><td>［設定］→ プロファイル →「ログイン IP アドレスの制限」</td><td>［設定］→「セキュリティ」→「ネットワークアクセス」</td></tr>
+          <tr><th scope="row">適用範囲</th><td><strong>そのプロファイルのユーザだけ</strong></td><td><strong>組織のすべてのユーザ</strong></td></tr>
+          <tr><th scope="row">目的</th><td>許可した場所以外からのログインを<strong>させない</strong></td><td>信頼できる場所からのログインで<strong>本人確認を省く</strong></td></tr>
+          <tr><th scope="row">範囲内のとき</th><td>ログインできる</td><td>確認コードなしでログインできる</td></tr>
+          <tr><th scope="row">範囲外のとき</th><td><strong>ログインできない（拒否）</strong></td><td><strong>ログインはできる</strong>。ただしメール等の確認コードが必要</td></tr>
+          <tr><th scope="row">API・データローダ</th><td>範囲外なら同じく拒否される</td><td>範囲内なら<strong>セキュリティトークンが不要</strong>になる</td></tr>
+          <tr><th scope="row">未設定のとき</th><td>IP による制限なし（どこからでも可）</td><td>すべての接続元が「信頼済みでない」扱い</td></tr>
+          <tr><th scope="row">典型的な使い方</th><td>本社オフィスからのみ操作させたい経理担当プロファイル</td><td>社内ネットワークからは毎回の確認コードを省きたい</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 460" role="img" aria-labelledby="fig3t fig3d">
+          <title id="fig3t">2 つの IP 設定の組み合わせによる結果のマトリクス</title>
+          <desc id="fig3d">縦軸がプロファイルのログインIP範囲の内外、横軸が組織の信頼済みIP範囲の内外。ログインIP範囲外は信頼済みかどうかに関わらず拒否され、範囲内かつ信頼済みなら確認なしでログイン、範囲内だが信頼済みでない場合は本人確認コードが必要になる。</desc>
+
+          <!-- 軸ラベル -->
+          <text x="330" y="24" class="m" font-size="11" letter-spacing="1.4" fill="var(--org)">組織：信頼済み IP 範囲</text>
+          <rect x="330" y="36" width="330" height="34" rx="8" fill="var(--org-bg)" stroke="var(--org)" />
+          <text x="495" y="58" font-size="13" font-weight="700" fill="var(--org)" text-anchor="middle">範囲内（社内ネットワークなど）</text>
+          <rect x="676" y="36" width="330" height="34" rx="8" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="841" y="58" font-size="13" font-weight="700" fill="var(--muted)" text-anchor="middle">範囲外（自宅・外出先など）</text>
+
+          <text x="16" y="100" class="m" font-size="11" letter-spacing="1.4" fill="var(--profile)">プロファイル：ログイン IP 制限</text>
+          <rect x="16" y="112" width="296" height="140" rx="8" fill="var(--profile-bg)" stroke="var(--profile)" />
+          <text x="164" y="172" font-size="13" font-weight="700" fill="var(--profile)" text-anchor="middle">範囲内、または</text>
+          <text x="164" y="194" font-size="13" font-weight="700" fill="var(--profile)" text-anchor="middle">そもそも制限を設定していない</text>
+          <rect x="16" y="268" width="296" height="140" rx="8" fill="var(--profile-bg)" stroke="var(--profile)" />
+          <text x="164" y="345" font-size="13" font-weight="700" fill="var(--profile)" text-anchor="middle">範囲外</text>
+
+          <!-- セル：左上 = 許可 -->
+          <rect x="330" y="112" width="330" height="140" rx="10" fill="var(--allow-bg)" stroke="var(--allow)" stroke-width="1.8" />
+          <text x="352" y="146" font-size="15" font-weight="700" fill="var(--allow)">そのままログイン</text>
+          <g font-size="12.5" fill="var(--ink-2)">
+            <text x="352" y="174">・確認コードの入力なし</text>
+            <text x="352" y="198">・API / データローダはトークン不要</text>
+            <text x="352" y="222">・最も摩擦の少ない状態</text>
+          </g>
+
+          <!-- セル：右上 = 本人確認 -->
+          <rect x="676" y="112" width="330" height="140" rx="10" fill="var(--verify-bg)" stroke="var(--verify)" stroke-width="1.8" />
+          <text x="698" y="146" font-size="15" font-weight="700" fill="var(--verify)">本人確認コードが必要</text>
+          <g font-size="12.5" fill="var(--ink-2)">
+            <text x="698" y="174">・メールや認証アプリでコードを受け取る</text>
+            <text x="698" y="198">・API / データローダはトークンが必要</text>
+            <text x="698" y="222">・拒否ではない。確認さえ通れば入れる</text>
+          </g>
+
+          <!-- セル：左下 = 拒否 -->
+          <rect x="330" y="268" width="330" height="140" rx="10" fill="var(--block-bg)" stroke="var(--block)" stroke-width="1.8" />
+          <text x="352" y="302" font-size="15" font-weight="700" fill="var(--block)">ログインできない</text>
+          <g font-size="12.5" fill="var(--ink-2)">
+            <text x="352" y="330">・信頼済み IP 範囲に入っていても救済されない</text>
+            <text x="352" y="354">・プロファイルの制限のほうが強い</text>
+            <text x="352" y="378">・「制限された IP アドレス」と記録される</text>
+          </g>
+
+          <!-- セル：右下 = 拒否 -->
+          <rect x="676" y="268" width="330" height="140" rx="10" fill="var(--block-bg)" stroke="var(--block)" stroke-width="1.8" />
+          <text x="698" y="302" font-size="15" font-weight="700" fill="var(--block)">ログインできない</text>
+          <g font-size="12.5" fill="var(--ink-2)">
+            <text x="698" y="330">・在宅勤務を始めた途端に入れなくなる典型例</text>
+            <text x="698" y="354">・解決するにはプロファイルに範囲を追加する</text>
+            <text x="698" y="378">・信頼済み IP をいくら足しても直らない</text>
+          </g>
+
+          <!-- 結論帯 -->
+          <rect x="16" y="424" width="1008" height="30" rx="8" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="36" y="444" font-size="12.5" fill="var(--ink-2)">結論：縦（プロファイル）が「入れるかどうか」を決め、横（組織）は「入れる場合にどれだけ手間がかかるか」だけを決める。</text>
+        </svg>
+      </div>
+      <figcaption>
+        図 3 ／ 下段が両方とも赤いのがポイントです。<b>プロファイルの IP 制限は信頼済み IP 範囲では上書きできません</b>。
+        「信頼済み IP に追加したのにログインできない」という相談は、たいてい原因がプロファイル側にあります。
+      </figcaption>
+    </figure>
+
+    <h3 style="--hue: var(--profile)">設定するときの手順</h3>
+    <ol class="steps p">
+      <li><b>接続元の IP アドレスを確認する</b><span>社内の固定グローバル IP を把握する。ログイン履歴の「送信元 IP アドレス」列からも実際の値を確認できる。</span></li>
+      <li><b>プロファイルに範囲を登録する</b><span>［設定］→ プロファイル → 対象プロファイル →「ログイン IP アドレスの制限」で開始 IP と終了 IP を入力。IPv4 / IPv6 に対応し、複数行を登録できる。</span></li>
+      <li><b>自分が締め出されないか確かめる</b><span>システム管理者プロファイルに厳しい制限をかけると、管理者自身が入れなくなる。作業前に別の管理者ユーザを用意しておくのが定石。</span></li>
+      <li><b>信頼済み IP 範囲は別途登録する</b><span>［設定］→「ネットワークアクセス」に登録すると、その範囲からは確認コードとセキュリティトークンが不要になる。プロファイル側の制限とは独立した設定。</span></li>
+    </ol>
+
+    <div class="note block">
+      <span class="label">締め出しに注意</span>
+      プロファイルの IP 制限は、そのプロファイルのユーザ全員に即時に効きます。自分自身のプロファイルに設定して範囲を間違えると、
+      <strong>誰もログインできない組織</strong>ができあがります。設定前に、制限のかかっていない管理者ユーザを 1 つ確保しておいてください。
+    </div>
+  </section>
+
+  <!-- ============================ 04 ============================ -->
+  <section id="hours">
+    <div class="sec-head"><span class="num">04</span><h2>ログイン時間制限 — 曜日と時間帯で絞る</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        <strong>プロファイル単位</strong>で「この曜日のこの時間しかログインさせない」を設定できます。
+        アルバイトや業務委託のアカウントを業務時間内に限定する、といった用途です。
+      </p>
+    </div>
+
+    <div class="cards">
+      <div class="card" style="--hue: var(--profile)">
+        <h4>設定場所 <span class="tag">PROFILE</span></h4>
+        <p>［設定］→ プロファイル →「ログイン時間」。曜日ごとに開始時刻と終了時刻を指定します。何も設定しなければ制限なしです。</p>
+      </div>
+      <div class="card" style="--hue: var(--verify)">
+        <h4>判定に使うタイムゾーン <span class="tag">TIMEZONE</span></h4>
+        <p>ユーザ個人のタイムゾーンではなく<strong>組織の既定のタイムゾーン</strong>で判定されます。海外拠点のユーザがいる組織では特に間違えやすい点です。</p>
+      </div>
+      <div class="card" style="--hue: var(--block)">
+        <h4>時間外になったとき <span class="tag">SESSION</span></h4>
+        <p>ログイン中に終了時刻を迎えると、<strong>そのまま操作を続けることはできなくなります</strong>。表示中のページは見えていても、保存や画面遷移をしようとするとログイン画面に戻されます。</p>
+      </div>
+      <div class="card" style="--hue: var(--org)">
+        <h4>IP 制限との組み合わせ <span class="tag">COMBINE</span></h4>
+        <p>ログイン時間と IP 制限はどちらもプロファイル単位で、<strong>両方を満たさないとログインできません</strong>。「社内から、かつ営業時間内だけ」という絞り込みができます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 05 ============================ -->
+  <section id="mfa">
+    <div class="sec-head"><span class="num">05</span><h2>本人確認・MFA・セキュリティトークン</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        「追加でもう一段確かめる」仕組みは 3 つあり、目的が異なります。
+        <strong>ID 確認</strong>は見慣れない接続元への確認、<strong>MFA</strong>は常時要求される 2 つ目の要素、
+        <strong>セキュリティトークン</strong>は画面を持たない API 接続のための代替手段です。
+      </p>
+    </div>
+
+    <div class="cards">
+      <div class="card" style="--hue: var(--verify)">
+        <h4>ID 確認（デバイスの有効化） <span class="tag">VERIFY</span></h4>
+        <p>信頼済み IP 範囲外から、かつ見慣れないブラウザやデバイスでログインすると、メールなどに確認コードが送られます。一度確認したブラウザは記憶されます。</p>
+      </div>
+      <div class="card" style="--hue: var(--verify)">
+        <h4>多要素認証（MFA） <span class="tag">MFA</span></h4>
+        <p>パスワードに加えて、Salesforce Authenticator・認証アプリ（TOTP）・セキュリティキーなどの 2 つ目の要素を必須にします。現在は全ユーザで必須の扱いです。</p>
+      </div>
+      <div class="card" style="--hue: var(--org)">
+        <h4>セキュリティトークン <span class="tag">API</span></h4>
+        <p>API やデータローダなど画面を持たない接続で、確認コードの代わりに使う 24 文字の文字列。<strong>パスワードの末尾に連結して</strong>送ります。</p>
+      </div>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 330" role="img" aria-labelledby="fig4t fig4d">
+          <title id="fig4t">API・データローダ接続でセキュリティトークンが必要になる条件</title>
+          <desc id="fig4d">接続元が信頼済みIP範囲内ならパスワードだけで接続でき、範囲外ならパスワードにセキュリティトークンを連結する必要がある。</desc>
+
+          <defs>
+            <marker id="t-arrow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--allow)" />
+            </marker>
+            <marker id="t-arrow-v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--verify)" />
+            </marker>
+          </defs>
+
+          <text x="16" y="24" class="m" font-size="11" letter-spacing="1.6" fill="var(--muted)">API / DATA LOADER — 接続時の認証情報</text>
+
+          <!-- 起点 -->
+          <rect x="16" y="120" width="230" height="76" rx="10" fill="var(--paper)" stroke="var(--line)" />
+          <text x="36" y="150" font-size="14" font-weight="700" fill="var(--ink)">データローダ等から接続</text>
+          <text x="36" y="172" font-size="12.5" fill="var(--muted)">ユーザ名とパスワードで認証</text>
+
+          <!-- 判定 -->
+          <rect x="286" y="118" width="196" height="80" rx="40" fill="var(--org-bg)" stroke="var(--org)" stroke-width="1.6" />
+          <text x="384" y="150" font-size="13" font-weight="700" fill="var(--org)" text-anchor="middle">接続元は</text>
+          <text x="384" y="172" font-size="13" font-weight="700" fill="var(--org)" text-anchor="middle">信頼済み IP 範囲内か</text>
+          <path d="M246 158 H278" stroke="var(--org)" stroke-width="2" marker-end="url(#t-arrow-v)" />
+
+          <!-- はい -->
+          <path d="M482 146 H540 V88 H592" stroke="var(--allow)" stroke-width="2" fill="none" marker-end="url(#t-arrow-a)" />
+          <text x="548" y="78" class="m" font-size="11" fill="var(--allow)">はい</text>
+          <rect x="600" y="56" width="424" height="72" rx="10" fill="var(--allow-bg)" stroke="var(--allow)" />
+          <text x="622" y="84" font-size="14" font-weight="700" fill="var(--allow)">パスワードだけで接続できる</text>
+          <text x="622" y="108" class="m" font-size="12.5" fill="var(--ink-2)">password</text>
+
+          <!-- いいえ -->
+          <path d="M482 170 H540 V232 H592" stroke="var(--verify)" stroke-width="2" fill="none" marker-end="url(#t-arrow-v)" />
+          <text x="548" y="252" class="m" font-size="11" fill="var(--verify)">いいえ</text>
+          <rect x="600" y="200" width="424" height="72" rx="10" fill="var(--verify-bg)" stroke="var(--verify)" />
+          <text x="622" y="228" font-size="14" font-weight="700" fill="var(--verify)">パスワード＋セキュリティトークン</text>
+          <text x="622" y="252" class="m" font-size="12.5" fill="var(--ink-2)">password + 24文字のトークン（区切り文字なしで連結）</text>
+
+          <!-- 補足 -->
+          <rect x="16" y="286" width="1008" height="30" rx="8" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="36" y="306" font-size="12.5" fill="var(--ink-2)">トークンはパスワードを変更するたびに再発行される。個人設定の「私のセキュリティトークンのリセット」でメール送信できる。</text>
+        </svg>
+      </div>
+      <figcaption>
+        図 4 ／ 「データローダで急にログインできなくなった」の原因はほぼこれです。<b>パスワードを変えるとトークンも変わる</b>ため、
+        古いトークンを設定に保存したままのバッチ処理が失敗します。
+      </figcaption>
+    </figure>
+
+    <div class="note verify">
+      <span class="label">MFA と ID 確認の違い</span>
+      ID 確認は「いつもと違う場所・端末からのログイン」に反応する<strong>条件付き</strong>の確認で、信頼済み IP 範囲内なら省略されます。
+      一方 MFA は<strong>条件に関わらず毎回</strong>要求される 2 つ目の要素です。「社内からなら MFA も省略されるのか」という問いの答えは<strong>いいえ</strong>です。
+    </div>
+  </section>
+
+  <!-- ============================ 06 ============================ -->
+  <section id="session">
+    <div class="sec-head"><span class="num">06</span><h2>セッションの設定 — ログインしたあとの寿命</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        ログインに成功したあとの挙動は <strong>［設定］→「セキュリティ」→「セッションの設定」</strong> で決まります。
+        組織全体の既定値に対して、プロファイル側でセッションタイムアウトを個別に上書きできます。
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>表 3 ／ セッションの設定でよく問われる項目</caption>
+        <thead>
+          <tr>
+            <th scope="col">設定項目</th>
+            <th scope="col">値・挙動</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">セッションのタイムアウト値</th><td><span class="num">15 分〜24 時間</span>（既定 2 時間）。無操作がこの時間続くと自動的にログアウトされる。プロファイル単位でも設定できる。</td></tr>
+          <tr><th scope="row">タイムアウト警告のポップアップ</th><td>切断の直前に警告を表示し、その場でセッションを延長させる。無効にすると予告なくログアウトされる。</td></tr>
+          <tr><th scope="row">セッションを発信元 IP アドレスにロック</th><td>ログイン時と異なる IP からのアクセスでセッションを無効にする。モバイル回線の切り替えなどで頻繁に切れることがあるため注意。</td></tr>
+          <tr><th scope="row">安全な接続（HTTPS）が必要</th><td>すべての通信を HTTPS に強制する。既定で有効で、通常は無効にしない。</td></tr>
+          <tr><th scope="row">ログイン IP 範囲の適用時に強制</th><td>プロファイルの IP 制限を、ログイン時だけでなくセッション中も継続的に評価する設定。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note org">
+      <span class="label">タイムアウトと時間制限の違い</span>
+      セッションタイムアウトは<strong>無操作の長さ</strong>で切れるもの、ログイン時間制限は<strong>時計の時刻</strong>で切れるものです。
+      「操作していたのに 18 時ちょうどで切れた」ならログイン時間制限、「席を外していたら切れた」ならセッションタイムアウトです。
+    </div>
+  </section>
+
+  <!-- ============================ 07 ============================ -->
+  <section id="ops">
+    <div class="sec-head"><span class="num">07</span><h2>運用と切り分け — 入れないと言われたら</h2></div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 420" role="img" aria-labelledby="fig5t fig5d">
+          <title id="fig5t">ログインできないときの症状・原因・対処の対応表</title>
+          <desc id="fig5d">制限されたIPアドレス、ログイン時間外、確認コードの要求、パスワードのロック、データローダの認証失敗、それぞれの原因と対処を並べた図。</desc>
+
+          <g class="m" font-size="11" letter-spacing="1.4" fill="var(--muted)">
+            <text x="16" y="20">症状・ログイン履歴の記録</text>
+            <text x="420" y="20">原因になっている設定</text>
+            <text x="720" y="20">対処</text>
+          </g>
+          <line x1="16" y1="30" x2="1024" y2="30" stroke="var(--line)" />
+
+          <!-- 行1 -->
+          <g>
+            <rect x="16" y="42" width="386" height="56" rx="9" fill="var(--block-bg)" stroke="var(--block)" />
+            <text x="36" y="66" font-size="13.5" font-weight="700" fill="var(--block)">「制限された IP アドレス」</text>
+            <text x="36" y="86" font-size="12" fill="var(--ink-2)">正しいパスワードでも弾かれる</text>
+            <rect x="420" y="42" width="280" height="56" rx="9" fill="var(--profile-bg)" stroke="var(--profile)" />
+            <text x="440" y="66" font-size="13" font-weight="700" fill="var(--profile)">プロファイルの IP 制限</text>
+            <text x="440" y="86" font-size="12" fill="var(--ink-2)">在宅・出張・回線変更で範囲外に</text>
+            <text x="720" y="66" font-size="12.5" fill="var(--ink)">プロファイルに接続元の範囲を追加する</text>
+            <text x="720" y="86" font-size="12" fill="var(--muted)">信頼済み IP に足しても解決しない</text>
+          </g>
+          <line x1="16" y1="110" x2="1024" y2="110" stroke="var(--line-soft)" />
+
+          <!-- 行2 -->
+          <g>
+            <rect x="16" y="122" width="386" height="56" rx="9" fill="var(--block-bg)" stroke="var(--block)" />
+            <text x="36" y="146" font-size="13.5" font-weight="700" fill="var(--block)">「制限された時間」</text>
+            <text x="36" y="166" font-size="12" fill="var(--ink-2)">朝や夜だけログインできない</text>
+            <rect x="420" y="122" width="280" height="56" rx="9" fill="var(--profile-bg)" stroke="var(--profile)" />
+            <text x="440" y="146" font-size="13" font-weight="700" fill="var(--profile)">プロファイルのログイン時間</text>
+            <text x="440" y="166" font-size="12" fill="var(--ink-2)">判定は組織の既定タイムゾーン</text>
+            <text x="720" y="146" font-size="12.5" fill="var(--ink)">時間帯を広げるか、別プロファイルに分ける</text>
+            <text x="720" y="166" font-size="12" fill="var(--muted)">タイムゾーンのずれも確認する</text>
+          </g>
+          <line x1="16" y1="190" x2="1024" y2="190" stroke="var(--line-soft)" />
+
+          <!-- 行3 -->
+          <g>
+            <rect x="16" y="202" width="386" height="56" rx="9" fill="var(--verify-bg)" stroke="var(--verify)" />
+            <text x="36" y="226" font-size="13.5" font-weight="700" fill="var(--verify)">毎回コードを求められる</text>
+            <text x="36" y="246" font-size="12" fill="var(--ink-2)">ログインはできるが手間がかかる</text>
+            <rect x="420" y="202" width="280" height="56" rx="9" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="440" y="226" font-size="13" font-weight="700" fill="var(--org)">信頼済み IP 範囲の外</text>
+            <text x="440" y="246" font-size="12" fill="var(--ink-2)">またはブラウザの Cookie 削除</text>
+            <text x="720" y="226" font-size="12.5" fill="var(--ink)">社内の範囲をネットワークアクセスに登録</text>
+            <text x="720" y="246" font-size="12" fill="var(--muted)">MFA は省略されない点に注意</text>
+          </g>
+          <line x1="16" y1="270" x2="1024" y2="270" stroke="var(--line-soft)" />
+
+          <!-- 行4 -->
+          <g>
+            <rect x="16" y="282" width="386" height="56" rx="9" fill="var(--block-bg)" stroke="var(--block)" />
+            <text x="36" y="306" font-size="13.5" font-weight="700" fill="var(--block)">アカウントがロックされた</text>
+            <text x="36" y="326" font-size="12" fill="var(--ink-2)">失敗を繰り返した直後から入れない</text>
+            <rect x="420" y="282" width="280" height="56" rx="9" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="440" y="306" font-size="13" font-weight="700" fill="var(--org)">ログイン試行の最大許容回数</text>
+            <text x="440" y="326" font-size="12" fill="var(--ink-2)">パスワードポリシーの設定</text>
+            <text x="720" y="306" font-size="12.5" fill="var(--ink)">有効期間の経過を待つか［ロック解除］</text>
+            <text x="720" y="326" font-size="12" fill="var(--muted)">必要ならパスワードもリセットする</text>
+          </g>
+          <line x1="16" y1="350" x2="1024" y2="350" stroke="var(--line-soft)" />
+
+          <!-- 行5 -->
+          <g>
+            <rect x="16" y="362" width="386" height="52" rx="9" fill="var(--verify-bg)" stroke="var(--verify)" />
+            <text x="36" y="386" font-size="13.5" font-weight="700" fill="var(--verify)">データローダだけ認証に失敗する</text>
+            <text x="36" y="404" font-size="12" fill="var(--ink-2)">ブラウザからは問題なく入れる</text>
+            <rect x="420" y="362" width="280" height="52" rx="9" fill="var(--org-bg)" stroke="var(--org)" />
+            <text x="440" y="386" font-size="13" font-weight="700" fill="var(--org)">セキュリティトークン</text>
+            <text x="440" y="404" font-size="12" fill="var(--ink-2)">パスワード変更で失効している</text>
+            <text x="720" y="386" font-size="12.5" fill="var(--ink)">トークンをリセットして連結し直す</text>
+            <text x="720" y="404" font-size="12" fill="var(--muted)">信頼済み IP 範囲内なら不要になる</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        図 5 ／ 症状の色がそのまま性質を表します。<b>赤は設定を変えないと入れないもの</b>、<b>琥珀は手順を踏めば入れるもの</b>。
+        原因側の色（紫か藍緑か）は、どの画面を開けばよいかを示しています。
+      </figcaption>
+    </figure>
+
+    <h3 style="--hue: var(--org)">調査と復旧に使う道具</h3>
+    <div class="cards">
+      <div class="card" style="--hue: var(--org)">
+        <h4>ログイン履歴 <span class="tag">LOG</span></h4>
+        <p>［設定］→「ログイン履歴」で直近 6 か月・最大 2 万件を確認できます。日時・送信元 IP・ログイン種別・状況（成功／失敗理由）が並び、CSV でダウンロードもできます。原因の特定はまずここから。</p>
+      </div>
+      <div class="card" style="--hue: var(--user)">
+        <h4>ユーザとしてログイン <span class="tag">LOGIN AS</span></h4>
+        <p>管理者がユーザの画面をそのまま再現して確認できます。組織の設定で「管理者がすべてのユーザとしてログインできる」を有効にするか、ユーザ側から期限付きでログインアクセスを許可してもらいます。</p>
+      </div>
+      <div class="card" style="--hue: var(--verify)">
+        <h4>凍結と無効化 <span class="tag">USER</span></h4>
+        <p><strong>凍結</strong>は一時的にログインを止めるだけでライセンスは解放されません。<strong>無効化</strong>はライセンスを解放しますが、承認プロセスなどに関わっていると実行できない場合があります。ユーザの<strong>削除はできません</strong>。</p>
+      </div>
+      <div class="card" style="--hue: var(--profile)">
+        <h4>委任管理者 <span class="tag">DELEGATE</span></h4>
+        <p>システム管理者権限を丸ごと渡さずに、「特定プロファイルのユーザ作成とパスワードリセットだけ」を部門担当に任せられます。ロック解除やリセットの依頼を分散させたいときに使います。</p>
+      </div>
+    </div>
+
+    <h3 style="--hue: var(--block)">よくある取り違え</h3>
+    <ul class="check" style="--hue: var(--block)">
+      <li>信頼済み IP 範囲に追加すれば IP 制限を回避できる、と考えてしまう（できません。別の設定です）</li>
+      <li>ログイン時間の判定をユーザ個人のタイムゾーンだと思い込む（組織の既定タイムゾーンです）</li>
+      <li>ロック解除とパスワードリセットを同じ操作だと思う（ロック解除はパスワードを変えません）</li>
+      <li>MFA が信頼済み IP 範囲内で省略されると考える（省略されるのは ID 確認のほうです）</li>
+      <li>セッションタイムアウトとログイン時間制限を混同する（無操作か、時刻かの違いです）</li>
+      <li>権限セットでログイン IP 範囲を設定しようとする（IP 制限とログイン時間はプロファイル側の設定です）</li>
+    </ul>
+  </section>
+
+  <!-- ============================ 08 ============================ -->
+  <section id="exam">
+    <div class="sec-head"><span class="num">08</span><h2>試験ポイントの総ざらい</h2></div>
+    <div class="col">
+      <p class="sec-lede">設定場所と「拒否か確認か」の区別がそのまま出題されます。太字部分が答えになりやすい箇所です。</p>
+    </div>
+
+    <ol class="points">
+      <li><span class="k">01</span><span>プロファイルの<em>ログイン IP アドレスの制限は、範囲外を完全に拒否する</em>。</span></li>
+      <li><span class="k">02</span><span>組織全体の<em>信頼済み IP 範囲は、範囲内で本人確認を省略する</em>設定。範囲外でもログイン自体はできる。</span></li>
+      <li><span class="k">03</span><span>両者が競合したときは<em>プロファイルの制限が優先</em>し、信頼済み IP では救済されない。</span></li>
+      <li><span class="k">04</span><span>信頼済み IP 範囲は <em>［設定］→「ネットワークアクセス」</em>、IP 制限は<em>プロファイル</em>で設定する。</span></li>
+      <li><span class="k">05</span><span>ログイン時間制限は<em>プロファイル単位</em>で、判定は<em>組織の既定タイムゾーン</em>。</span></li>
+      <li><span class="k">06</span><span>ログイン中に時間外になると、<em>それ以上の操作ができなくなる</em>。</span></li>
+      <li><span class="k">07</span><span>パスワードポリシーは<em>組織全体とプロファイルの両方</em>で設定でき、プロファイル側が優先される。</span></li>
+      <li><span class="k">08</span><span>パスワードの有効期限の既定は <em>90 日</em>、最小文字数の既定は <em>8 文字</em>、履歴の既定は <em>3 個</em>。</span></li>
+      <li><span class="k">09</span><span>ロックアウトの有効期間には <em>15 / 30 / 60 分</em>と<em>管理者が解除するまで</em>がある。</span></li>
+      <li><span class="k">10</span><span><em>ロック解除とパスワードリセットは別の操作</em>。ロック解除ではパスワードは変わらない。</span></li>
+      <li><span class="k">11</span><span>「パスワード無期限」権限を持つユーザは<em>有効期限の対象外</em>になる。</span></li>
+      <li><span class="k">12</span><span>セキュリティトークンは <em>API・データローダなど画面を持たない接続</em>で使い、<em>パスワードの末尾に連結</em>する。</span></li>
+      <li><span class="k">13</span><span><em>信頼済み IP 範囲内からの接続ではセキュリティトークンが不要</em>になる。</span></li>
+      <li><span class="k">14</span><span>トークンは<em>パスワードを変更するたびに再発行</em>され、古いトークンは使えなくなる。</span></li>
+      <li><span class="k">15</span><span>ID 確認は<em>見慣れない接続元・端末</em>で発生する条件付きの確認、MFA は<em>毎回必須</em>の 2 つ目の要素。</span></li>
+      <li><span class="k">16</span><span>セッションのタイムアウト値は <em>15 分〜24 時間</em>（既定 2 時間）で、プロファイル単位でも設定できる。</span></li>
+      <li><span class="k">17</span><span>ログイン履歴では<em>直近 6 か月・最大 2 万件</em>を確認でき、CSV でダウンロードできる。</span></li>
+      <li><span class="k">18</span><span>ユーザは<em>削除できない</em>。<em>凍結はライセンスを解放せず</em>、<em>無効化は解放する</em>。</span></li>
+      <li><span class="k">19</span><span>管理者が代理でログインするには<em>「ユーザとしてログイン」</em>を使い、ユーザ側の<em>ログインアクセス許可</em>が必要な場合がある。</span></li>
+      <li><span class="k">20</span><span>IP 制限とログイン時間は<em>権限セットでは設定できず、プロファイル側</em>の設定である。</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>
+      SF Learner ／ Salesforce 認定アドミニストレーター学習ポータル — 「設定とセットアップ」ドメイン補助教材。<br />
+      関連ページ：<a href="./data-import-export.html">データのインポート / エクスポート 図解</a>（データローダとセキュリティトークンの関係はこちらにも登場します）。<br />
+      記載の既定値・仕様は Salesforce の標準機能に基づきます。エディションやリリースにより異なる場合があるため、実運用の前には公式ドキュメントで最新の値を確認してください。
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>

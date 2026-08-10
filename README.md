@@ -29,8 +29,12 @@ React + Vite 製で、学習データはブラウザの localStorage に保存�
 
 ### 図解リファレンス（単体ページ）
 
-`public/data-import-export.html` — 「Salesforce データのインポート / エクスポート」の色分け図解。データインポートウィザードとデータローダの使い分け判定、6つの操作、upsert と外部ID、データエクスポートサービスまでを5点の SVG 図で解説する。
-ビルド時に `dist/` へそのままコピーされ、公開先は <https://solahy.github.io/Salesforce-learner/data-import-export.html>。React アプリとは独立した静的 HTML（依存なし・ライト/ダークテーマ対応）。
+React アプリとは独立した静的 HTML。依存なし・JS 不要・ライト/ダークテーマ対応で、ビルド時に `dist/` へそのままコピーされる。色を意味に固定し、各ページ 5 点の SVG 図で解説する。
+
+| ファイル | 内容 | 公開URL |
+| --- | --- | --- |
+| `public/data-import-export.html` | データのインポート / エクスポート。ウィザードとデータローダの使い分け判定、6つの操作、upsert と外部ID、データエクスポートサービス | <https://solahy.github.io/Salesforce-learner/data-import-export.html> |
+| `public/login-security.html` | ログインとアクセス制御。パスワードポリシー、プロファイルのIP制限と組織の信頼済みIP範囲の違い、ログイン時間、MFA・セキュリティトークン、セッション設定 | <https://solahy.github.io/Salesforce-learner/login-security.html> |
 
 ### 問題数（単元別）
 
