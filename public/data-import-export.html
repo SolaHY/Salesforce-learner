@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Salesforce のデータインポート・エクスポートを図解。データインポートウィザードとデータローダの使い分け、6つの操作、upsert と外部ID、データエクスポートサービスまで。" />
+<title>Salesforce データのインポート / エクスポート 図解</title>
+<style>
+/* ============================================================
+   トークン：ライトを既定にし、system(未指定) と明示 dark の両方を上書きする
+   ============================================================ */
+:root {
+  --paper: #ffffff;
+  --ground: #f2f5fa;
+  --ground-2: #e8edf5;
+  --line: #dde3ec;
+  --line-soft: #eaeef5;
+  --ink: #111726;
+  --ink-2: #39404f;
+  --muted: #5c6577;
+
+  --wizard: #1b6fe0;      /* インポートウィザード */
+  --wizard-bg: #e8f1fd;
+  --loader: #7549cf;      /* データローダ */
+  --loader-bg: #f0eafc;
+  --export: #16794c;      /* エクスポート・バックアップ */
+  --export-bg: #e4f3ea;
+  --warn: #a25c00;        /* 照合・注意 */
+  --warn-bg: #fdf1de;
+  --danger: #c0332e;      /* 破壊的操作 */
+  --danger-bg: #fdeceb;
+  --api: #0d7183;         /* API 層 */
+  --api-bg: #e2f2f4;
+
+  --shadow: 0 1px 2px rgba(17, 23, 38, .05), 0 10px 28px -18px rgba(17, 23, 38, .35);
+  --sans: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #151c29;
+    --ground: #0d121c;
+    --ground-2: #1b2330;
+    --line: #2a3444;
+    --line-soft: #212a38;
+    --ink: #eef2f8;
+    --ink-2: #c3ccda;
+    --muted: #8d99ac;
+
+    --wizard: #62a6f7;  --wizard-bg: #14263c;
+    --loader: #b18ef0;  --loader-bg: #241d3a;
+    --export: #45bd84;  --export-bg: #102c22;
+    --warn:   #e0a44a;  --warn-bg:   #2e2314;
+    --danger: #f0736c;  --danger-bg: #331a1a;
+    --api:    #4bbccf;  --api-bg:    #102a2f;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 30px -20px rgba(0, 0, 0, .9);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #151c29;
+  --ground: #0d121c;
+  --ground-2: #1b2330;
+  --line: #2a3444;
+  --line-soft: #212a38;
+  --ink: #eef2f8;
+  --ink-2: #c3ccda;
+  --muted: #8d99ac;
+
+  --wizard: #62a6f7;  --wizard-bg: #14263c;
+  --loader: #b18ef0;  --loader-bg: #241d3a;
+  --export: #45bd84;  --export-bg: #102c22;
+  --warn:   #e0a44a;  --warn-bg:   #2e2314;
+  --danger: #f0736c;  --danger-bg: #331a1a;
+  --api:    #4bbccf;  --api-bg:    #102a2f;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 30px -20px rgba(0, 0, 0, .9);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.9;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+   レイアウト
+   ============================================================ */
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
+.col { max-width: 74ch; }
+.band { margin: 28px 0; }
+
+/* ---- ヘッダー ---- */
+.hero {
+  padding: 64px 0 36px;
+  border-bottom: 1px solid var(--line);
+}
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+h1 {
+  font-size: clamp(30px, 4.4vw, 46px);
+  line-height: 1.28;
+  letter-spacing: -.02em;
+  font-weight: 700;
+  margin: 0 0 18px;
+  text-wrap: balance;
+}
+h1 .accent { color: var(--wizard); }
+h1 .accent-2 { color: var(--export); }
+.lede { font-size: 17px; color: var(--ink-2); margin: 0; max-width: 68ch; }
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 12px;
+  margin-top: 32px;
+}
+.fact {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.fact .n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  display: block;
+}
+.fact .l { font-size: 12.5px; color: var(--muted); line-height: 1.6; display: block; margin-top: 4px; }
+.fact.w .n { color: var(--wizard); }
+.fact.l2 .n { color: var(--loader); }
+.fact.e .n { color: var(--export); }
+.fact.a .n { color: var(--warn); }
+
+/* ---- ナビ ---- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.nav-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 10px 24px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.nav a {
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  text-decoration: none;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 5px 13px;
+  white-space: nowrap;
+  transition: border-color .15s, color .15s;
+}
+.nav a:hover { color: var(--ink); border-color: var(--muted); }
+.nav a:focus-visible, a:focus-visible { outline: 2px solid var(--wizard); outline-offset: 2px; }
+.nav a .i { font-family: var(--mono); color: var(--muted); margin-right: 6px; }
+
+/* ---- セクション ---- */
+section { padding-top: 56px; scroll-margin-top: 62px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; border-top: 2px solid var(--ink); padding-top: 14px; }
+.sec-head .num {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--muted);
+  padding-top: 6px;
+}
+h2 {
+  font-size: clamp(21px, 2.6vw, 27px);
+  line-height: 1.45;
+  letter-spacing: -.01em;
+  margin: 0;
+  font-weight: 700;
+  text-wrap: balance;
+}
+h3 {
+  font-size: 17px;
+  margin: 34px 0 10px;
+  letter-spacing: -.005em;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+h3::before {
+  content: "";
+  width: 4px;
+  height: 17px;
+  border-radius: 2px;
+  background: var(--hue, var(--muted));
+  flex: 0 0 auto;
+}
+p { margin: 12px 0; }
+.sec-lede { color: var(--ink-2); margin-top: 14px; }
+strong { font-weight: 700; }
+code, .mono {
+  font-family: var(--mono);
+  font-size: .88em;
+  font-variant-numeric: tabular-nums;
+}
+code {
+  background: var(--ground-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* ---- 図版 ---- */
+figure {
+  margin: 24px 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.fig-scroll { overflow-x: auto; padding: 20px 20px 8px; }
+figure svg { display: block; width: 100%; height: auto; }
+figcaption {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 10px 20px 16px;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 8px;
+  line-height: 1.75;
+}
+figcaption b { color: var(--ink-2); font-weight: 700; }
+svg text { font-family: var(--sans); }
+svg .m { font-family: var(--mono); }
+
+/* ---- 表 ---- */
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; min-width: 660px; font-size: 14px; }
+caption { text-align: left; font-size: 12.5px; color: var(--muted); padding: 12px 16px 0; }
+th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; line-height: 1.7; }
+thead th { font-size: 12.5px; color: var(--muted); font-weight: 700; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
+thead th.c-w { color: var(--wizard); }
+thead th.c-l { color: var(--loader); }
+tbody th { font-weight: 700; width: 30%; color: var(--ink); }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; }
+td .num, th .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ---- チップ・バッジ ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; padding: 0; list-style: none; }
+.chip {
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 5px 11px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.chip .mk { font-family: var(--mono); font-weight: 700; }
+.chip.ok { background: var(--wizard-bg); color: var(--wizard); border-color: color-mix(in srgb, var(--wizard) 28%, transparent); }
+.chip.ng { background: var(--danger-bg); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 28%, transparent); }
+
+/* ---- カード群 ---- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 14px; margin: 18px 0; }
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--hue, var(--muted));
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.card h4 {
+  margin: 0 0 6px;
+  font-size: 14.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.card h4 .op { font-family: var(--mono); font-size: 13px; color: var(--hue); font-weight: 700; }
+.card p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.8; }
+.card .tag {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 6px;
+  color: var(--muted);
+}
+
+/* ---- 注意ボックス ---- */
+.note {
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 18px 0;
+  font-size: 14px;
+  line-height: 1.85;
+  border: 1px solid color-mix(in srgb, var(--hue, var(--muted)) 32%, transparent);
+  background: var(--hue-bg, var(--ground-2));
+}
+.note .label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--hue, var(--muted));
+  font-weight: 700;
+  display: block;
+  margin-bottom: 4px;
+}
+.note.warn { --hue: var(--warn); --hue-bg: var(--warn-bg); }
+.note.danger { --hue: var(--danger); --hue-bg: var(--danger-bg); }
+.note.api { --hue: var(--api); --hue-bg: var(--api-bg); }
+
+/* ---- 手順（縦のタイムライン） ---- */
+.steps { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 0; counter-reset: s; }
+.steps li {
+  counter-increment: s;
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  column-gap: 16px;
+  padding: 0 0 22px;
+}
+/* 番号バッジ：1 列目・2 行ぶんにまたがる */
+.steps li::before {
+  content: counter(s, decimal-leading-zero);
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+  z-index: 1;
+  width: 34px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--hue, var(--muted));
+  background: var(--hue-bg, var(--ground-2));
+  border: 1px solid color-mix(in srgb, var(--hue, var(--muted)) 30%, transparent);
+  border-radius: 8px;
+}
+/* 縦のレール */
+.steps li::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 32px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--line);
+}
+.steps li:last-child::after { display: none; }
+.steps.w { --hue: var(--wizard); --hue-bg: var(--wizard-bg); }
+.steps.l { --hue: var(--loader); --hue-bg: var(--loader-bg); }
+.steps li b {
+  grid-column: 2;
+  font-size: 15px;
+  line-height: 1.75;
+  letter-spacing: -.005em;
+}
+.steps li span {
+  grid-column: 2;
+  display: block;
+  margin-top: 2px;
+  max-width: 64ch;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.9;
+}
+
+/* ---- チェックリスト ---- */
+.check { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 8px; }
+.check li {
+  position: relative;
+  padding-left: 28px;
+  font-size: 14px;
+  line-height: 1.85;
+}
+.check li::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 11px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--hue, var(--export));
+  transform: rotate(45deg);
+}
+
+/* ---- 試験ポイント ---- */
+.points { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.points li {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.points li .k {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  padding-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.points li em { font-style: normal; font-weight: 700; color: var(--warn); }
+
+footer {
+  margin-top: 72px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.9;
+}
+footer a { color: var(--wizard); }
+
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px 72px; }
+  .nav-inner { padding: 8px 16px; }
+  .hero { padding-top: 40px; }
+  body { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="セクション">
+  <div class="nav-inner">
+    <a href="#overview"><span class="i">01</span>全体像</a>
+    <a href="#choose"><span class="i">02</span>使い分け判定</a>
+    <a href="#wizard"><span class="i">03</span>インポートウィザード</a>
+    <a href="#loader"><span class="i">04</span>データローダ</a>
+    <a href="#upsert"><span class="i">05</span>upsert と外部ID</a>
+    <a href="#export"><span class="i">06</span>エクスポート／バックアップ</a>
+    <a href="#pitfalls"><span class="i">07</span>落とし穴</a>
+    <a href="#exam"><span class="i">08</span>試験ポイント</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">Salesforce Certified Administrator ／ データと分析の管理</p>
+    <h1>Salesforce データの<span class="accent">インポート</span>と<span class="accent-2">エクスポート</span></h1>
+    <p class="lede">
+      CSV を「入れる」手段と「出す」手段を、ツールごとに色分けして図解します。
+      判断の軸は最後まで同じ 4 つ — <strong>件数</strong>・<strong>対象オブジェクト</strong>・<strong>重複防止の要否</strong>・<strong>操作の種類</strong>。
+      この 4 つでツールが決まる、という構造で読み進めてください。
+    </p>
+
+    <div class="facts">
+      <div class="fact w"><span class="n">50,000</span><span class="l">インポートウィザードの上限（1 回あたりの件数）</span></div>
+      <div class="fact l2"><span class="n">5,000,000</span><span class="l">データローダが扱える最大レコード数</span></div>
+      <div class="fact a"><span class="n">6</span><span class="l">データローダの操作種別（insert 〜 export all）</span></div>
+      <div class="fact e"><span class="n">48<small>h</small></span><span class="l">エクスポートサービスのファイル保持時間</span></div>
+    </div>
+  </header>
+
+  <!-- ============================ 01 ============================ -->
+  <section id="overview">
+    <div class="sec-head"><span class="num">01</span><h2>全体像 — 組織の外と中を行き来する 6 つの経路</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        Salesforce のデータ移動は、上向き（外 → 組織＝インポート）が 3 経路、下向き（組織 → 外＝エクスポート）が 3 経路。
+        まずこの 6 本のレーンを頭に入れると、個々のツールの説明がどこに刺さるのかが分かります。
+        <strong>ウィザードだけがブラウザ画面で完結</strong>し、それ以外はすべて <strong>API 層</strong>を通る、という区別が要点です。
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 560" role="img" aria-labelledby="fig1t fig1d">
+          <title id="fig1t">インポート 3 経路とエクスポート 3 経路の全体マップ</title>
+          <desc id="fig1d">左が組織の外（CSV・他システム）、右が Salesforce 組織。上段の 3 本がインポート、下段の 3 本がエクスポートの経路で、データローダと API 連携は API 層を経由する。</desc>
+
+          <defs>
+            <marker id="ar-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--wizard)" />
+            </marker>
+            <marker id="ar-l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--loader)" />
+            </marker>
+            <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--api)" />
+            </marker>
+            <marker id="ar-e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--export)" />
+            </marker>
+          </defs>
+
+          <!-- 見出し帯 -->
+          <text x="0" y="16" class="m" font-size="12" letter-spacing="2" fill="var(--muted)">組織の外</text>
+          <text x="1040" y="16" class="m" font-size="12" letter-spacing="2" fill="var(--muted)" text-anchor="end">SALESFORCE 組織</text>
+
+          <!-- 左：外部 -->
+          <rect x="0" y="28" width="176" height="500" rx="12" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="88" y="62" font-size="14" font-weight="700" fill="var(--ink)" text-anchor="middle">外部データ</text>
+          <g font-size="12.5" fill="var(--ink-2)">
+            <rect x="18" y="82" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="88" y="104" text-anchor="middle">CSV ファイル</text>
+            <rect x="18" y="124" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="88" y="146" text-anchor="middle">表計算ソフト</text>
+            <rect x="18" y="166" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="88" y="188" text-anchor="middle">基幹・他システム</text>
+            <rect x="18" y="208" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="88" y="230" text-anchor="middle">バックアップ保管先</text>
+          </g>
+          <text x="88" y="272" class="m" font-size="11" fill="var(--muted)" text-anchor="middle">UTF-8 / 日付書式に注意</text>
+
+          <!-- 右：組織 -->
+          <rect x="864" y="28" width="176" height="500" rx="12" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="952" y="62" font-size="14" font-weight="700" fill="var(--ink)" text-anchor="middle">オブジェクト</text>
+          <g font-size="12.5" fill="var(--ink-2)">
+            <rect x="882" y="82" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="952" y="104" text-anchor="middle">取引先 / 責任者</text>
+            <rect x="882" y="124" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="952" y="146" text-anchor="middle">リード / 商談</text>
+            <rect x="882" y="166" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="952" y="188" text-anchor="middle">ケース / カスタム</text>
+            <rect x="882" y="208" width="140" height="34" rx="7" fill="var(--paper)" stroke="var(--line)" />
+            <text x="952" y="230" text-anchor="middle">添付・ファイル</text>
+          </g>
+          <text x="952" y="272" class="m" font-size="11" fill="var(--muted)" text-anchor="middle">入力規則・重複ルールが適用</text>
+
+          <!-- API 層（縦帯） -->
+          <rect x="700" y="28" width="140" height="500" rx="12" fill="var(--api-bg)" stroke="var(--api)" stroke-dasharray="5 4" opacity="0.9" />
+          <text x="770" y="56" class="m" font-size="12" font-weight="700" fill="var(--api)" text-anchor="middle">API 層</text>
+          <text x="770" y="76" font-size="11.5" fill="var(--api)" text-anchor="middle">SOAP / Bulk API</text>
+          <text x="770" y="508" font-size="11" fill="var(--api)" text-anchor="middle">API 有効なエディション</text>
+
+          <!-- インポート 3 レーン -->
+          <text x="196" y="104" class="m" font-size="11" letter-spacing="1.6" fill="var(--wizard)">IMPORT ↑ 外 → 組織</text>
+
+          <g>
+            <rect x="196" y="116" width="470" height="56" rx="10" fill="var(--wizard-bg)" stroke="var(--wizard)" />
+            <text x="212" y="140" font-size="14" font-weight="700" fill="var(--wizard)">データインポートウィザード</text>
+            <text x="212" y="160" font-size="12" fill="var(--ink-2)">ブラウザ画面のみ・インストール不要・重複防止あり</text>
+            <rect x="560" y="128" width="94" height="32" rx="8" fill="var(--paper)" stroke="var(--wizard)" />
+            <text x="607" y="149" class="m" font-size="12" font-weight="700" fill="var(--wizard)" text-anchor="middle">5万件/回</text>
+            <path d="M176 144 H190" stroke="var(--wizard)" stroke-width="2" marker-end="url(#ar-w)" />
+            <!-- API 層に切り欠きを作り、ウィザードが API を経由しないことを示す -->
+            <rect x="698" y="114" width="144" height="60" fill="var(--paper)" />
+            <path d="M666 144 H856" stroke="var(--wizard)" stroke-width="2" marker-end="url(#ar-w)" />
+            <text x="770" y="136" font-size="11" fill="var(--wizard)" text-anchor="middle">画面処理（API 不使用）</text>
+          </g>
+
+          <g>
+            <rect x="196" y="188" width="470" height="56" rx="10" fill="var(--loader-bg)" stroke="var(--loader)" />
+            <text x="212" y="212" font-size="14" font-weight="700" fill="var(--loader)">データローダ</text>
+            <text x="212" y="232" font-size="12" fill="var(--ink-2)">別インストールのアプリ・全オブジェクト対応・6 操作</text>
+            <rect x="560" y="200" width="94" height="32" rx="8" fill="var(--paper)" stroke="var(--loader)" />
+            <text x="607" y="221" class="m" font-size="12" font-weight="700" fill="var(--loader)" text-anchor="middle">500万件</text>
+            <path d="M176 216 H190" stroke="var(--loader)" stroke-width="2" marker-end="url(#ar-l)" />
+            <path d="M666 216 H856" stroke="var(--loader)" stroke-width="2" marker-end="url(#ar-l)" />
+            <circle cx="770" cy="216" r="5" fill="var(--api)" />
+          </g>
+
+          <g>
+            <rect x="196" y="260" width="470" height="56" rx="10" fill="var(--api-bg)" stroke="var(--api)" />
+            <text x="212" y="284" font-size="14" font-weight="700" fill="var(--api)">API 連携 / ETL・dataloader.io など</text>
+            <text x="212" y="304" font-size="12" fill="var(--ink-2)">自動連携・スケジュール実行（開発／外部サービス）</text>
+            <rect x="560" y="272" width="94" height="32" rx="8" fill="var(--paper)" stroke="var(--api)" />
+            <text x="607" y="293" class="m" font-size="12" font-weight="700" fill="var(--api)" text-anchor="middle">上限は契約</text>
+            <path d="M176 288 H190" stroke="var(--api)" stroke-width="2" marker-end="url(#ar-a)" />
+            <path d="M666 288 H856" stroke="var(--api)" stroke-width="2" marker-end="url(#ar-a)" />
+            <circle cx="770" cy="288" r="5" fill="var(--api)" />
+          </g>
+
+          <!-- 区切り -->
+          <line x1="196" y1="338" x2="840" y2="338" stroke="var(--line)" stroke-dasharray="4 5" />
+
+          <!-- エクスポート 3 レーン -->
+          <text x="196" y="368" class="m" font-size="11" letter-spacing="1.6" fill="var(--export)">EXPORT ↓ 組織 → 外</text>
+
+          <g>
+            <rect x="196" y="380" width="470" height="56" rx="10" fill="var(--export-bg)" stroke="var(--export)" />
+            <text x="212" y="404" font-size="14" font-weight="700" fill="var(--export)">データエクスポートサービス</text>
+            <text x="212" y="424" font-size="12" fill="var(--ink-2)">組織の全データを ZIP（CSV 群）で・週次／月次の自動実行</text>
+            <rect x="560" y="392" width="94" height="32" rx="8" fill="var(--paper)" stroke="var(--export)" />
+            <text x="607" y="413" class="m" font-size="12" font-weight="700" fill="var(--export)" text-anchor="middle">48時間保持</text>
+            <path d="M856 408 H666" stroke="var(--export)" stroke-width="2" marker-end="url(#ar-e)" />
+            <path d="M190 408 H176" stroke="var(--export)" stroke-width="2" marker-end="url(#ar-e)" />
+          </g>
+
+          <g>
+            <rect x="196" y="452" width="470" height="56" rx="10" fill="var(--loader-bg)" stroke="var(--loader)" />
+            <text x="212" y="476" font-size="14" font-weight="700" fill="var(--loader)">データローダ Export / Export All</text>
+            <text x="212" y="496" font-size="12" fill="var(--ink-2)">SOQL で対象を絞って CSV 抽出・コマンドラインで定期実行も可</text>
+            <rect x="560" y="464" width="94" height="32" rx="8" fill="var(--paper)" stroke="var(--loader)" />
+            <text x="607" y="485" class="m" font-size="12" font-weight="700" fill="var(--loader)" text-anchor="middle">SOQL 指定</text>
+            <path d="M856 480 H666" stroke="var(--loader)" stroke-width="2" marker-end="url(#ar-l)" />
+            <path d="M190 480 H176" stroke="var(--loader)" stroke-width="2" marker-end="url(#ar-l)" />
+            <circle cx="770" cy="480" r="5" fill="var(--api)" />
+          </g>
+
+          <g>
+            <rect x="196" y="524" width="470" height="30" rx="8" fill="var(--paper)" stroke="var(--export)" stroke-dasharray="4 4" />
+            <text x="212" y="544" font-size="12.5" fill="var(--export)">レポートエクスポート — 個別レポートを .csv / .xlsx で出力（部分的な取り出し向け）</text>
+            <path d="M856 539 H666" stroke="var(--export)" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#ar-e)" />
+            <path d="M190 539 H176" stroke="var(--export)" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#ar-e)" />
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        図 1 ／ <b>青＝インポートウィザード</b>、<b>紫＝データローダ</b>、<b>藍緑＝API 連携</b>、<b>緑＝エクスポート・バックアップ</b>。
+        以降の図でもこの配色は同じ意味で使います。API 層の●印は「その経路が API を消費する」ことを示します。
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================ 02 ============================ -->
+  <section id="choose">
+    <div class="sec-head"><span class="num">02</span><h2>使い分け判定 — 4 つの問いで一意に決まる</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        試験でもっとも問われるのは「このシナリオではどちらを使うか」です。
+        暗記ではなく、上から順に 4 つ問うだけで機械的に決まります。<strong>ひとつでも紫側に落ちたらデータローダ</strong>、
+        全部を通り抜けたときだけインポートウィザードが選べます。
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 470" role="img" aria-labelledby="fig2t fig2d">
+          <title id="fig2t">インポートウィザードとデータローダの判定フローチャート</title>
+          <desc id="fig2d">件数が5万件を超えるか、ウィザード非対応オブジェクトか、削除・エクスポート・upsert が必要か、を順に判定し、いずれかに該当すればデータローダ、すべて否ならインポートウィザード。重複を自動で防ぎたい場合はウィザードが有利。</desc>
+
+          <defs>
+            <marker id="a2-l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--loader)" />
+            </marker>
+            <marker id="a2-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--wizard)" />
+            </marker>
+          </defs>
+
+          <!-- 開始 -->
+          <rect x="18" y="24" width="188" height="46" rx="23" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="112" y="53" font-size="13.5" font-weight="700" fill="var(--ink)" text-anchor="middle">CSV を取り込みたい</text>
+
+          <!-- 判定 1..4（縦に並ぶ） -->
+          <g>
+            <rect x="18" y="96" width="470" height="54" rx="10" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.4" />
+            <text x="38" y="119" class="m" font-size="11" fill="var(--muted)">Q1</text>
+            <text x="70" y="120" font-size="14" font-weight="700" fill="var(--ink)">1 回のデータが 50,000 件を超える？</text>
+            <text x="70" y="139" font-size="12" fill="var(--muted)">ウィザードの 1 回あたりの上限は 5 万件</text>
+          </g>
+          <g>
+            <rect x="18" y="176" width="470" height="54" rx="10" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.4" />
+            <text x="38" y="199" class="m" font-size="11" fill="var(--muted)">Q2</text>
+            <text x="70" y="200" font-size="14" font-weight="700" fill="var(--ink)">商談・ケースなど非対応オブジェクト？</text>
+            <text x="70" y="219" font-size="12" fill="var(--muted)">ウィザードは取引先・責任者・リード等のみ</text>
+          </g>
+          <g>
+            <rect x="18" y="256" width="470" height="54" rx="10" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.4" />
+            <text x="38" y="279" class="m" font-size="11" fill="var(--muted)">Q3</text>
+            <text x="70" y="280" font-size="14" font-weight="700" fill="var(--ink)">削除・抽出・upsert をしたい？</text>
+            <text x="70" y="299" font-size="12" fill="var(--muted)">ウィザードは「追加 / 更新」だけ</text>
+          </g>
+          <g>
+            <rect x="18" y="336" width="470" height="54" rx="10" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.4" />
+            <text x="38" y="359" class="m" font-size="11" fill="var(--muted)">Q4</text>
+            <text x="70" y="360" font-size="14" font-weight="700" fill="var(--ink)">重複を自動で防ぎたい？</text>
+            <text x="70" y="379" font-size="12" fill="var(--muted)">照合キーで既存レコードと突き合わせたい</text>
+          </g>
+
+          <!-- 縦の NO ライン -->
+          <path d="M112 70 V96" stroke="var(--ink)" stroke-width="1.6" />
+          <path d="M112 150 V176" stroke="var(--ink)" stroke-width="1.6" />
+          <path d="M112 230 V256" stroke="var(--ink)" stroke-width="1.6" />
+          <path d="M112 310 V336" stroke="var(--ink)" stroke-width="1.6" />
+          <g class="m" font-size="11" fill="var(--muted)">
+            <text x="122" y="167">いいえ</text>
+            <text x="122" y="247">いいえ</text>
+            <text x="122" y="327">いいえ</text>
+          </g>
+
+          <!-- はい → データローダ -->
+          <path d="M488 123 H620" stroke="var(--loader)" stroke-width="2" marker-end="url(#a2-l)" />
+          <path d="M488 203 H620" stroke="var(--loader)" stroke-width="2" marker-end="url(#a2-l)" />
+          <path d="M488 283 H620" stroke="var(--loader)" stroke-width="2" marker-end="url(#a2-l)" />
+          <g class="m" font-size="11" fill="var(--loader)">
+            <text x="500" y="115">はい</text>
+            <text x="500" y="195">はい</text>
+            <text x="500" y="275">はい</text>
+          </g>
+
+          <rect x="628" y="96" width="394" height="190" rx="12" fill="var(--loader-bg)" stroke="var(--loader)" stroke-width="1.6" />
+          <text x="652" y="130" font-size="17" font-weight="700" fill="var(--loader)">データローダ</text>
+          <g font-size="13" fill="var(--ink-2)">
+            <text x="652" y="158">・最大 500 万件／全オブジェクト対応</text>
+            <text x="652" y="182">・insert / update / upsert / delete / hard delete / export</text>
+            <text x="652" y="206">・API 経由なので大量処理と自動化に強い</text>
+            <text x="652" y="230">・設定を保存してコマンドラインで定期実行できる</text>
+          </g>
+          <rect x="652" y="244" width="346" height="28" rx="7" fill="var(--paper)" stroke="var(--danger)" />
+          <text x="666" y="263" font-size="12" fill="var(--danger)">重複チェックは自動では行われない（upsert 以外は単純追加）</text>
+
+          <!-- Q4 分岐 -->
+          <path d="M488 363 H620" stroke="var(--wizard)" stroke-width="2" marker-end="url(#a2-w)" />
+          <text x="500" y="355" class="m" font-size="11" fill="var(--wizard)">はい／いいえ</text>
+
+          <rect x="628" y="316" width="394" height="132" rx="12" fill="var(--wizard-bg)" stroke="var(--wizard)" stroke-width="1.6" />
+          <text x="652" y="350" font-size="17" font-weight="700" fill="var(--wizard)">データインポートウィザード</text>
+          <g font-size="13" fill="var(--ink-2)">
+            <text x="652" y="378">・ブラウザだけで完結、インストール不要</text>
+            <text x="652" y="402">・照合キーで<tspan font-weight="700" fill="var(--wizard)">重複を防止</tspan>できる唯一の標準ツール</text>
+            <text x="652" y="426">・「追加のみ / 更新のみ / 追加と更新」を選んで実行</text>
+          </g>
+
+        </svg>
+      </div>
+      <figcaption>
+        図 2 ／ Q1〜Q3 のどれか一つでも「はい」なら<b>データローダ一択</b>。すべて「いいえ」まで来て初めてウィザードが候補になり、
+        Q4 が「はい」ならウィザードの重複防止が決め手になります。
+      </figcaption>
+    </figure>
+
+    <h3 style="--hue: var(--ink-2)">仕様の対比</h3>
+    <div class="table-scroll">
+      <table>
+        <caption>表 1 ／ データインポートウィザードとデータローダの比較</caption>
+        <thead>
+          <tr>
+            <th scope="col">観点</th>
+            <th scope="col" class="c-w">データインポートウィザード</th>
+            <th scope="col" class="c-l">データローダ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">動作環境</th><td>ブラウザの設定画面のみ。インストール不要</td><td>Windows / macOS 版のクライアントアプリを別途インストール</td></tr>
+          <tr><th scope="row">件数の上限</th><td><span class="num">50,000</span> 件／回</td><td><span class="num">5,000,000</span> 件（Bulk API 利用時が現実的）</td></tr>
+          <tr><th scope="row">対象オブジェクト</th><td>取引先・取引先責任者・リード・ソリューション・キャンペーンメンバー・個人取引先・カスタムオブジェクト</td><td><strong>すべて</strong>の標準／カスタムオブジェクト（商談・ケースも可）</td></tr>
+          <tr><th scope="row">できる操作</th><td>追加のみ／更新のみ／追加と更新（削除・抽出は不可）</td><td><code>insert</code> <code>update</code> <code>upsert</code> <code>delete</code> <code>hard delete</code> <code>export</code> / <code>export all</code></td></tr>
+          <tr><th scope="row">重複防止</th><td><strong>あり</strong>。照合キー（メール・名前など）で既存と突き合わせる</td><td><strong>なし</strong>。upsert の外部 ID を使わない限り単純追加</td></tr>
+          <tr><th scope="row">エクスポート</th><td>不可</td><td>SOQL で抽出して CSV 出力（<code>export all</code> は削除済みも含む）</td></tr>
+          <tr><th scope="row">API の消費</th><td>しない（画面処理）</td><td>する（SOAP / Bulk API のコール数を消費）</td></tr>
+          <tr><th scope="row">自動化</th><td>不可（毎回手動）</td><td>設定ファイルを保存し、コマンドラインで定期実行が可能</td></tr>
+          <tr><th scope="row">主な用途</th><td>数千件規模の顧客リスト取り込み、名寄せしながらの更新</td><td>データ移行、大量更新、一括削除、定期バックアップ</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================ 03 ============================ -->
+  <section id="wizard">
+    <div class="sec-head"><span class="num">03</span><h2>データインポートウィザード — 重複を作らせないための道具</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        ウィザードの本質は「手軽さ」ではなく<strong>重複防止</strong>です。件数が小さくても、
+        重複を自動で弾きたいならこちらを選ぶ。逆に対応オブジェクトの狭さが最大の制約で、
+        <strong>商談とケースが対象外</strong>という点が引っかけとして頻出します。
+      </p>
+    </div>
+
+    <h3 style="--hue: var(--wizard)">対応オブジェクト</h3>
+    <ul class="chips">
+      <li class="chip ok"><span class="mk">○</span>取引先</li>
+      <li class="chip ok"><span class="mk">○</span>取引先責任者</li>
+      <li class="chip ok"><span class="mk">○</span>リード</li>
+      <li class="chip ok"><span class="mk">○</span>ソリューション</li>
+      <li class="chip ok"><span class="mk">○</span>キャンペーンメンバー</li>
+      <li class="chip ok"><span class="mk">○</span>個人取引先</li>
+      <li class="chip ok"><span class="mk">○</span>カスタムオブジェクト</li>
+      <li class="chip ng"><span class="mk">×</span>商談</li>
+      <li class="chip ng"><span class="mk">×</span>ケース</li>
+      <li class="chip ng"><span class="mk">×</span>ユーザ</li>
+      <li class="chip ng"><span class="mk">×</span>商品・価格表</li>
+    </ul>
+
+    <h3 style="--hue: var(--wizard)">実行の流れ</h3>
+    <ol class="steps w">
+      <li><b>データの種類を選ぶ</b><span>［設定］→「データインポートウィザード」→ 標準オブジェクトかカスタムオブジェクトかを選択。</span></li>
+      <li><b>処理を選ぶ</b><span>「新規レコードの追加」「既存レコードの更新」「追加と更新の同時実行」から選び、<strong>照合キー</strong>（取引先責任者・リードはメール、取引先はサイト付き名称、カスタムは外部 ID など）を指定する。</span></li>
+      <li><b>CSV をアップロードして項目をマッピング</b><span>CSV の列と Salesforce の項目を対応づける。未マッピングの列は取り込まれない。文字コードや区切り文字もここで指定。</span></li>
+      <li><b>開始 → 結果をメールで受け取る</b><span>「一括データ読み込みジョブ」画面で進捗を確認。完了後、成功・失敗件数がメール通知される。</span></li>
+    </ol>
+
+    <div class="note warn">
+      <span class="label">照合キーの挙動</span>
+      照合キーが一致した場合の動きは選んだ処理で変わります。「追加のみ」なら一致行はスキップ、「更新のみ」なら一致行だけ更新して新規は作らない、「追加と更新」なら一致すれば更新・なければ作成（＝ウィザード版の upsert）。
+      <strong>ワークフロールール・入力規則・重複ルールはウィザード経由でも発動します。</strong>
+    </div>
+  </section>
+
+  <!-- ============================ 04 ============================ -->
+  <section id="loader">
+    <div class="sec-head"><span class="num">04</span><h2>データローダ — 6 つの操作を色で覚える</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        データローダの操作は「新規に足すのか・既存を書き換えるのか・消すのか・取り出すのか」で 4 系統に分かれます。
+        鍵は <strong>レコード ID が必要かどうか</strong>、そして <strong>戻せるかどうか</strong>。この 2 軸で 6 操作を整理します。
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 470" role="img" aria-labelledby="fig3t fig3d">
+          <title id="fig3t">データローダ 6 操作の比較図</title>
+          <desc id="fig3d">insert は新規追加、update と upsert は既存を書き換え、delete はごみ箱へ、hard delete は完全削除、export はデータの抽出。それぞれ必要な入力と復元可否が異なる。</desc>
+
+          <defs>
+            <marker id="a3-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--wizard)" />
+            </marker>
+            <marker id="a3-l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--loader)" />
+            </marker>
+            <marker id="a3-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--warn)" />
+            </marker>
+            <marker id="a3-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--danger)" />
+            </marker>
+            <marker id="a3-e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--export)" />
+            </marker>
+          </defs>
+
+          <!-- ヘッダ -->
+          <g class="m" font-size="11" letter-spacing="1.4" fill="var(--muted)">
+            <text x="16" y="20">操作</text>
+            <text x="212" y="20">CSV に必要なもの</text>
+            <text x="520" y="20">レコードへの作用</text>
+            <text x="884" y="20">復元</text>
+          </g>
+          <line x1="16" y1="30" x2="1024" y2="30" stroke="var(--line)" />
+
+          <!-- 行テンプレート：y = 44 + i*68 -->
+          <!-- insert -->
+          <g>
+            <rect x="16" y="42" width="180" height="52" rx="9" fill="var(--wizard-bg)" stroke="var(--wizard)" />
+            <text x="34" y="66" class="m" font-size="14" font-weight="700" fill="var(--wizard)">insert</text>
+            <text x="34" y="84" font-size="11.5" fill="var(--ink-2)">挿入（新規追加）</text>
+            <text x="212" y="66" font-size="13" fill="var(--ink)">データ行のみ</text>
+            <text x="212" y="84" font-size="11.5" fill="var(--muted)">ID 不要</text>
+            <path d="M470 68 H508" stroke="var(--wizard)" stroke-width="2" marker-end="url(#a3-w)" />
+            <text x="520" y="66" font-size="13" fill="var(--ink)">全行を新しいレコードとして作成</text>
+            <text x="520" y="84" font-size="11.5" fill="var(--danger)">同じ CSV を 2 回流すと重複が発生</text>
+            <text x="884" y="74" font-size="12.5" fill="var(--muted)">削除で対応</text>
+          </g>
+          <line x1="16" y1="106" x2="1024" y2="106" stroke="var(--line-soft)" />
+
+          <!-- update -->
+          <g>
+            <rect x="16" y="114" width="180" height="52" rx="9" fill="var(--loader-bg)" stroke="var(--loader)" />
+            <text x="34" y="138" class="m" font-size="14" font-weight="700" fill="var(--loader)">update</text>
+            <text x="34" y="156" font-size="11.5" fill="var(--ink-2)">更新（上書き）</text>
+            <text x="212" y="138" font-size="13" fill="var(--ink)">レコード ID 列（15 / 18 桁）</text>
+            <text x="212" y="156" font-size="11.5" fill="var(--muted)">ID が無い行はエラー</text>
+            <path d="M470 140 H508" stroke="var(--loader)" stroke-width="2" marker-end="url(#a3-l)" />
+            <text x="520" y="138" font-size="13" fill="var(--ink)">ID 一致のレコードだけ項目を書き換え</text>
+            <text x="520" y="156" font-size="11.5" fill="var(--muted)">CSV に無い項目は変更されない</text>
+            <text x="884" y="146" font-size="12.5" fill="var(--muted)">不可（要事前 export）</text>
+          </g>
+          <line x1="16" y1="178" x2="1024" y2="178" stroke="var(--line-soft)" />
+
+          <!-- upsert -->
+          <g>
+            <rect x="16" y="186" width="180" height="52" rx="9" fill="var(--warn-bg)" stroke="var(--warn)" />
+            <text x="34" y="210" class="m" font-size="14" font-weight="700" fill="var(--warn)">upsert</text>
+            <text x="34" y="228" font-size="11.5" fill="var(--ink-2)">更新＋挿入</text>
+            <text x="212" y="210" font-size="13" fill="var(--ink)">照合キー列（外部 ID / レコード ID）</text>
+            <text x="212" y="228" font-size="11.5" fill="var(--muted)">外部 ID は「一意」属性が前提</text>
+            <path d="M470 212 H508" stroke="var(--warn)" stroke-width="2" marker-end="url(#a3-a)" />
+            <text x="520" y="210" font-size="13" fill="var(--ink)">一致すれば更新、無ければ新規作成</text>
+            <text x="520" y="228" font-size="11.5" fill="var(--muted)">外部システムとの同期の定番</text>
+            <text x="884" y="218" font-size="12.5" fill="var(--muted)">不可（要事前 export）</text>
+          </g>
+          <line x1="16" y1="250" x2="1024" y2="250" stroke="var(--line-soft)" />
+
+          <!-- delete -->
+          <g>
+            <rect x="16" y="258" width="180" height="52" rx="9" fill="var(--danger-bg)" stroke="var(--danger)" opacity=".85" />
+            <text x="34" y="282" class="m" font-size="14" font-weight="700" fill="var(--danger)">delete</text>
+            <text x="34" y="300" font-size="11.5" fill="var(--ink-2)">削除</text>
+            <text x="212" y="282" font-size="13" fill="var(--ink)">レコード ID 列</text>
+            <text x="212" y="300" font-size="11.5" fill="var(--muted)">項目値は不要</text>
+            <path d="M470 284 H508" stroke="var(--danger)" stroke-width="2" marker-end="url(#a3-d)" />
+            <text x="520" y="282" font-size="13" fill="var(--ink)">ごみ箱（Recycle Bin）へ移動</text>
+            <text x="520" y="300" font-size="11.5" fill="var(--muted)">子レコードも連動して消える点に注意</text>
+            <text x="884" y="290" font-size="12.5" fill="var(--export)">15 日以内なら可</text>
+          </g>
+          <line x1="16" y1="322" x2="1024" y2="322" stroke="var(--line-soft)" />
+
+          <!-- hard delete -->
+          <g>
+            <rect x="16" y="330" width="180" height="52" rx="9" fill="var(--danger-bg)" stroke="var(--danger)" stroke-width="1.8" />
+            <text x="34" y="354" class="m" font-size="14" font-weight="700" fill="var(--danger)">hard delete</text>
+            <text x="34" y="372" font-size="11.5" fill="var(--ink-2)">物理削除</text>
+            <text x="212" y="354" font-size="13" fill="var(--ink)">レコード ID 列</text>
+            <text x="212" y="372" font-size="11.5" fill="var(--danger)">「一括削除」権限＋Bulk API が必要</text>
+            <path d="M470 356 H508" stroke="var(--danger)" stroke-width="2.4" marker-end="url(#a3-d)" />
+            <text x="520" y="354" font-size="13" fill="var(--ink)">ごみ箱を経由せず完全に消える</text>
+            <text x="520" y="372" font-size="11.5" fill="var(--muted)">既定では実行できない（権限の付与が必要）</text>
+            <text x="884" y="362" font-size="12.5" font-weight="700" fill="var(--danger)">不可</text>
+          </g>
+          <line x1="16" y1="394" x2="1024" y2="394" stroke="var(--line-soft)" />
+
+          <!-- export -->
+          <g>
+            <rect x="16" y="402" width="180" height="52" rx="9" fill="var(--export-bg)" stroke="var(--export)" />
+            <text x="34" y="426" class="m" font-size="14" font-weight="700" fill="var(--export)">export / export all</text>
+            <text x="34" y="444" font-size="11.5" fill="var(--ink-2)">抽出</text>
+            <text x="212" y="426" font-size="13" fill="var(--ink)">SOQL クエリ（CSV 入力なし）</text>
+            <text x="212" y="444" font-size="11.5" fill="var(--muted)">対象項目と条件を指定</text>
+            <path d="M508 428 H470" stroke="var(--export)" stroke-width="2" marker-end="url(#a3-e)" />
+            <text x="520" y="426" font-size="13" fill="var(--ink)">結果を CSV に書き出す（読み取りのみ）</text>
+            <text x="520" y="444" font-size="11.5" fill="var(--muted)"><tspan class="m">export all</tspan> はごみ箱内・削除済みも含む</text>
+            <text x="884" y="434" font-size="12.5" fill="var(--muted)">影響なし</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        図 3 ／ 矢印の向きが「CSV → 組織」か「組織 → CSV」かを表します。<b>ID 列の要否</b>で insert と update が、
+        <b>ごみ箱を通るか</b>で delete と hard delete が分かれる、という 2 つの分岐が試験の核心です。
+      </figcaption>
+    </figure>
+
+    <h3 style="--hue: var(--loader)">導入と実行の流れ</h3>
+    <ol class="steps l">
+      <li><b>インストール</b><span>［設定］→「データローダ」からダウンロード。Windows / macOS 版があり、実行には Java 環境が必要（近年のバージョンは同梱）。API が使えるエディション（Enterprise / Unlimited / Performance / Developer など）が前提。</span></li>
+      <li><b>ログイン</b><span>ユーザ名＋パスワード＋セキュリティトークン、または OAuth で接続。信頼済み IP 範囲外からはトークンが必須。</span></li>
+      <li><b>操作を選ぶ</b><span>insert / update / upsert / delete / hard delete / export のいずれかを選択。</span></li>
+      <li><b>オブジェクトと CSV を指定</b><span>対象オブジェクトを選び、取り込む CSV（または出力先）を指定する。</span></li>
+      <li><b>項目マッピング</b><span>CSV 列と API 参照名を対応づける。マッピング定義（.sdl）を保存すれば次回以降に再利用できる。</span></li>
+      <li><b>実行と結果確認</b><span>処理後に <code>success.csv</code> と <code>error.csv</code> が出力される。error.csv にはエラー理由が行単位で記録されるので、修正して再実行する。</span></li>
+    </ol>
+
+    <div class="note api">
+      <span class="label">設定：Bulk API を使うかどうか</span>
+      既定は SOAP API（1 バッチ 200 件）。設定で「Use Bulk API」を有効にすると 1 バッチ 10,000 件になり、大量データが速く処理できます。
+      <strong>hard delete には Bulk API が必須</strong>。並列（Parallel）モードは速い一方でレコードロック競合が起きやすく、
+      親子関係のあるデータではシリアル（Serial）モードに切り替えるのが定石です。
+    </div>
+  </section>
+
+  <!-- ============================ 05 ============================ -->
+  <section id="upsert">
+    <div class="sec-head"><span class="num">05</span><h2>upsert と外部 ID — Salesforce の ID を知らなくても同期できる仕組み</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        外部 ID（External ID）は、他システムの主キー（顧客番号など）を格納するための項目属性です。
+        項目定義で「外部 ID」にチェックを入れると、その項目を <code>upsert</code> の照合キーに使えるようになります。
+        これにより <strong>Salesforce 側のレコード ID を一切知らなくても</strong>、外部システムのキーだけで更新と新規作成を振り分けられます。
+      </p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 400" role="img" aria-labelledby="fig4t fig4d">
+          <title id="fig4t">upsert における外部 ID の照合の流れ</title>
+          <desc id="fig4d">CSV の外部 ID 列の値を Salesforce の外部 ID 項目と突き合わせ、一致すれば既存レコードを更新、一致しなければ新規レコードを作成する。</desc>
+
+          <defs>
+            <marker id="a4-u" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--warn)" />
+            </marker>
+            <marker id="a4-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--wizard)" />
+            </marker>
+          </defs>
+
+          <!-- CSV -->
+          <text x="16" y="22" class="m" font-size="11" letter-spacing="1.6" fill="var(--muted)">取り込む CSV</text>
+          <rect x="16" y="34" width="270" height="196" rx="10" fill="var(--paper)" stroke="var(--line)" />
+          <rect x="16" y="34" width="270" height="34" rx="10" fill="var(--ground-2)" />
+          <line x1="16" y1="68" x2="286" y2="68" stroke="var(--line)" />
+          <text x="34" y="56" class="m" font-size="11.5" font-weight="700" fill="var(--ink-2)">顧客番号（外部 ID）</text>
+          <text x="196" y="56" class="m" font-size="11.5" font-weight="700" fill="var(--ink-2)">売上高</text>
+          <g class="m" font-size="12.5" fill="var(--ink)">
+            <text x="34" y="96">CUST-001</text><text x="196" y="96">1,200</text>
+            <text x="34" y="136">CUST-002</text><text x="196" y="136">3,400</text>
+            <text x="34" y="176">CUST-999</text><text x="196" y="176">560</text>
+          </g>
+          <line x1="16" y1="112" x2="286" y2="112" stroke="var(--line-soft)" />
+          <line x1="16" y1="152" x2="286" y2="152" stroke="var(--line-soft)" />
+          <text x="34" y="212" font-size="11.5" fill="var(--muted)">Salesforce のレコード ID は含まれていない</text>
+
+          <!-- 照合 -->
+          <rect x="330" y="90" width="150" height="84" rx="42" fill="var(--warn-bg)" stroke="var(--warn)" stroke-width="1.6" />
+          <text x="405" y="124" class="m" font-size="13" font-weight="700" fill="var(--warn)" text-anchor="middle">照合キー</text>
+          <text x="405" y="146" font-size="12" fill="var(--warn)" text-anchor="middle">顧客番号で突合</text>
+          <path d="M286 132 H322" stroke="var(--warn)" stroke-width="2" marker-end="url(#a4-u)" />
+
+          <!-- 分岐 -->
+          <path d="M480 118 H540 V70 H600" stroke="var(--warn)" stroke-width="2" fill="none" marker-end="url(#a4-u)" />
+          <path d="M480 146 H540 V262 H600" stroke="var(--wizard)" stroke-width="2" fill="none" marker-end="url(#a4-n)" />
+          <text x="548" y="58" class="m" font-size="11" fill="var(--warn)">一致した</text>
+          <text x="548" y="290" class="m" font-size="11" fill="var(--wizard)">一致しない</text>
+
+          <!-- 更新される既存レコード -->
+          <text x="612" y="22" class="m" font-size="11" letter-spacing="1.6" fill="var(--muted)">Salesforce の既存レコード</text>
+          <rect x="612" y="34" width="412" height="112" rx="10" fill="var(--warn-bg)" stroke="var(--warn)" />
+          <text x="632" y="60" class="m" font-size="12.5" fill="var(--ink)">CUST-001 ／ 株式会社アルファ</text>
+          <text x="632" y="82" font-size="12" fill="var(--warn)">売上高を 1,200 に<tspan font-weight="700">上書き（update）</tspan></text>
+          <line x1="632" y1="94" x2="1004" y2="94" stroke="var(--line-soft)" />
+          <text x="632" y="116" class="m" font-size="12.5" fill="var(--ink)">CUST-002 ／ ベータ商事</text>
+          <text x="632" y="138" font-size="12" fill="var(--warn)">売上高を 3,400 に<tspan font-weight="700">上書き（update）</tspan></text>
+
+          <!-- 新規作成 -->
+          <rect x="612" y="222" width="412" height="80" rx="10" fill="var(--wizard-bg)" stroke="var(--wizard)" stroke-dasharray="5 4" />
+          <text x="632" y="250" class="m" font-size="12.5" fill="var(--ink)">CUST-999</text>
+          <text x="632" y="272" font-size="12" fill="var(--wizard)">該当なし → <tspan font-weight="700">新規レコードを作成（insert）</tspan></text>
+          <text x="632" y="292" font-size="11.5" fill="var(--muted)">外部 ID の値もそのまま格納され、次回以降は更新側に回る</text>
+
+          <!-- 注記 -->
+          <rect x="16" y="252" width="500" height="128" rx="10" fill="var(--ground-2)" stroke="var(--line)" />
+          <text x="36" y="278" font-size="13" font-weight="700" fill="var(--ink)">外部 ID にするための条件</text>
+          <g font-size="12.5" fill="var(--ink-2)">
+            <text x="36" y="304">・項目定義で「外部 ID」を有効化（テキスト・数値・メール型で指定可）</text>
+            <text x="36" y="328">・照合キーに使うには「一意（Unique）」であることが実質必須</text>
+            <text x="36" y="352">・値が重複していると upsert は<tspan fill="var(--danger)" font-weight="700">エラー</tspan>になり、その行は取り込まれない</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        図 4 ／ <b>琥珀＝照合して更新</b>、<b>青＝該当なしで新規作成</b>。
+        外部 ID は参照関係の解決にも使え、親レコードの Salesforce ID を知らなくても「親の外部 ID」で子を紐づけられます。
+      </figcaption>
+    </figure>
+
+    <div class="note warn">
+      <span class="label">レコード ID の 15 桁と 18 桁</span>
+      Salesforce のレコード ID には 15 桁（大文字小文字を区別する）と 18 桁（区別しない）の 2 種類があります。
+      Excel などは大文字小文字を区別しないため、15 桁のまま加工すると別レコードを取り違えるおそれがあります。
+      CSV で扱うときは <strong>18 桁を使う</strong>のが安全です。
+    </div>
+  </section>
+
+  <!-- ============================ 06 ============================ -->
+  <section id="export">
+    <div class="sec-head"><span class="num">06</span><h2>エクスポートとバックアップ — 3 つの手段の役割分担</h2></div>
+    <div class="col">
+      <p class="sec-lede">
+        「取り出す」目的は大きく 3 つ — 組織まるごとの<strong>バックアップ</strong>、対象を絞った<strong>抽出</strong>、
+        分析用の<strong>レポート出力</strong>。用途が違うので、どれか一つで済ませようとすると破綻します。
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>表 2 ／ エクスポート手段の比較</caption>
+        <thead>
+          <tr>
+            <th scope="col">手段</th>
+            <th scope="col">出力</th>
+            <th scope="col">範囲</th>
+            <th scope="col">自動化</th>
+            <th scope="col">向く用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row" style="color: var(--export)">データエクスポートサービス</th>
+            <td>ZIP（CSV 群）</td>
+            <td>組織の全データ。添付・ドキュメント・Chatter ファイルも任意で含む</td>
+            <td>週次／月次のスケジュール</td>
+            <td>定期バックアップ</td>
+          </tr>
+          <tr>
+            <th scope="row" style="color: var(--loader)">データローダ export</th>
+            <td>CSV</td>
+            <td>SOQL で指定したオブジェクト・項目・条件のみ</td>
+            <td>コマンドラインで可能</td>
+            <td>移行前の退避、部分抽出</td>
+          </tr>
+          <tr>
+            <th scope="row" style="color: var(--export)">レポートエクスポート</th>
+            <td>.csv（詳細のみ）／.xlsx（書式付き）</td>
+            <td>そのレポートの結果行だけ</td>
+            <td>不可（サブスクリプション配信は別機能）</td>
+            <td>分析・共有用の切り出し</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="--hue: var(--export)">データエクスポートサービスの時間軸</h3>
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1040 250" role="img" aria-labelledby="fig5t fig5d">
+          <title id="fig5t">データエクスポートサービスのタイムライン</title>
+          <desc id="fig5d">スケジュール設定、ZIP 生成、メール通知、48 時間のダウンロード可能期間、その後の自動削除という流れ。</desc>
+
+          <defs>
+            <linearGradient id="g5" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="var(--export)" />
+              <stop offset="70%" stop-color="var(--warn)" />
+              <stop offset="100%" stop-color="var(--danger)" />
+            </linearGradient>
+            <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--danger)" />
+            </marker>
+          </defs>
+
+          <!-- 軸 -->
+          <rect x="40" y="112" width="930" height="8" rx="4" fill="url(#g5)" />
+          <path d="M970 116 H1000" stroke="var(--danger)" stroke-width="8" marker-end="url(#a5)" />
+
+          <!-- ノード -->
+          <g>
+            <circle cx="96" cy="116" r="9" fill="var(--paper)" stroke="var(--export)" stroke-width="3" />
+            <text x="96" y="88" font-size="13" font-weight="700" fill="var(--export)" text-anchor="middle">スケジュール設定</text>
+            <text x="96" y="152" font-size="12" fill="var(--ink-2)" text-anchor="middle">［設定］→</text>
+            <text x="96" y="170" font-size="12" fill="var(--ink-2)" text-anchor="middle">「データのエクスポート」</text>
+          </g>
+          <g>
+            <circle cx="340" cy="116" r="9" fill="var(--paper)" stroke="var(--export)" stroke-width="3" />
+            <text x="340" y="88" font-size="13" font-weight="700" fill="var(--export)" text-anchor="middle">ZIP 生成</text>
+            <text x="340" y="152" font-size="12" fill="var(--ink-2)" text-anchor="middle">全データを CSV 群にまとめる</text>
+            <text x="340" y="170" font-size="12" fill="var(--muted)" text-anchor="middle">添付・ファイルは任意で同梱</text>
+          </g>
+          <g>
+            <circle cx="584" cy="116" r="9" fill="var(--paper)" stroke="var(--warn)" stroke-width="3" />
+            <text x="584" y="88" font-size="13" font-weight="700" fill="var(--warn)" text-anchor="middle">完了メール通知</text>
+            <text x="584" y="152" font-size="12" fill="var(--ink-2)" text-anchor="middle">ここから 48 時間の</text>
+            <text x="584" y="170" font-size="12" fill="var(--ink-2)" text-anchor="middle">ダウンロード可能期間</text>
+          </g>
+          <g>
+            <circle cx="880" cy="116" r="9" fill="var(--paper)" stroke="var(--danger)" stroke-width="3" />
+            <text x="880" y="88" font-size="13" font-weight="700" fill="var(--danger)" text-anchor="middle">自動削除</text>
+            <text x="880" y="152" font-size="12" fill="var(--danger)" text-anchor="middle">48 時間で消える</text>
+            <text x="880" y="170" font-size="12" fill="var(--muted)" text-anchor="middle">取得できなければ次回まで待つ</text>
+          </g>
+
+          <!-- 48h 帯 -->
+          <rect x="584" y="196" width="296" height="30" rx="8" fill="var(--warn-bg)" stroke="var(--warn)" />
+          <text x="732" y="216" class="m" font-size="12.5" font-weight="700" fill="var(--warn)" text-anchor="middle">48 HOURS</text>
+
+          <!-- 頻度 -->
+          <rect x="40" y="190" width="500" height="46" rx="8" fill="var(--export-bg)" stroke="var(--export)" />
+          <text x="60" y="210" font-size="12" fill="var(--export)">頻度：Enterprise / Unlimited / Performance ＝ 週次または月次</text>
+          <text x="60" y="228" font-size="12" fill="var(--export)">その他のエディション ＝ 月次のみ</text>
+
+          <!-- タイトル -->
+          <text x="40" y="34" class="m" font-size="11" letter-spacing="1.6" fill="var(--muted)">DATA EXPORT SERVICE — 実行から失効まで</text>
+        </svg>
+      </div>
+      <figcaption>
+        図 5 ／ 色が緑 → 琥珀 → 赤へ移るのは、時間経過とともに<b>ファイルが失効に近づく</b>ことを表します。
+        「エクスポートしただけで安心」にならないよう、生成後すみやかに組織外へ保管する運用が必要です。
+      </figcaption>
+    </figure>
+
+    <div class="note danger">
+      <span class="label">標準機能の限界</span>
+      データエクスポートサービスは「取り出す」までしか担当しません。<strong>自動で復元する機能はありません</strong>。
+      復元まで含めた保護が必要なら、Salesforce Backup &amp; Restore やサードパーティ製品（OwnBackup など）を検討します。
+      なお、削除から <strong>15 日以内ならごみ箱から復元</strong>でき、そこを過ぎた場合は Salesforce のデータ復旧サービス（有償・時間がかかる）が最後の手段になります。
+    </div>
+  </section>
+
+  <!-- ============================ 07 ============================ -->
+  <section id="pitfalls">
+    <div class="sec-head"><span class="num">07</span><h2>実務と試験、両方で刺さる落とし穴</h2></div>
+
+    <div class="cards">
+      <div class="card" style="--hue: var(--danger)">
+        <h4>入力規則は API 経由でも効く <span class="tag">IMPORT</span></h4>
+        <p>データローダや API 経由の書き込みにも入力規則・必須項目・重複ルールが適用されます。大量インポートで一斉にエラーが出るのは典型例。事前に規則を確認し、必要なら一時的に無効化して、完了後に必ず戻します。</p>
+      </div>
+      <div class="card" style="--hue: var(--danger)">
+        <h4>読み取り専用でも防げない <span class="tag">SECURITY</span></h4>
+        <p>ページレイアウトで項目を読み取り専用にしても、データローダや API からの更新は止まりません。確実に守るなら項目レベルセキュリティか入力規則を使います。</p>
+      </div>
+      <div class="card" style="--hue: var(--warn)">
+        <h4>親 → 子の順に取り込む <span class="tag">ORDER</span></h4>
+        <p>参照関係／主従関係があるデータは、親レコードを先に作らないと子が紐づきません。親の外部 ID を子の CSV に載せておけば、Salesforce のレコード ID を知らなくても関連付けできます。</p>
+      </div>
+      <div class="card" style="--hue: var(--warn)">
+        <h4>文字コードと日付書式 <span class="tag">CSV</span></h4>
+        <p>日本語データは UTF-8 で保存する（Excel の既定のままだと文字化けしやすい）。日付はユーザのロケール設定に従うため、<code>YYYY-MM-DD</code> に揃えておくと事故が減ります。</p>
+      </div>
+      <div class="card" style="--hue: var(--loader)">
+        <h4>所有者と自動割り当て <span class="tag">OWNER</span></h4>
+        <p>Owner ID 列を省くと、インポートを実行したユーザが所有者になります。リードの割り当てルールなどを効かせたい場合は、ウィザード側でチェックを入れる必要があります。</p>
+      </div>
+      <div class="card" style="--hue: var(--loader)">
+        <h4>自動化が一斉に発火する <span class="tag">AUTOMATION</span></h4>
+        <p>インポートはワークフロー・フロー・トリガ・メール通知を起動します。数万件を一度に流すと大量のメールや処理が走るため、事前に対象の自動化を洗い出しておきます。</p>
+      </div>
+      <div class="card" style="--hue: var(--api)">
+        <h4>API コール数の消費 <span class="tag">LIMIT</span></h4>
+        <p>データローダは API を消費し、組織には 24 時間あたりのコール数上限があります。SOAP（200 件／バッチ）より Bulk API（10,000 件／バッチ）のほうが消費を抑えられます。</p>
+      </div>
+      <div class="card" style="--hue: var(--export)">
+        <h4>本番前にサンドボックスで <span class="tag">SAFE</span></h4>
+        <p>まず数十件のサブセットで試し、error.csv を確認してから全件を流します。update / delete の前には対象を <code>export</code> しておくと、失敗時に元へ戻せます。</p>
+      </div>
+    </div>
+
+    <h3 style="--hue: var(--export)">インポート前チェックリスト</h3>
+    <ul class="check">
+      <li>CSV は UTF-8、1 行目は列見出し、区切り文字は統一されているか</li>
+      <li>マッピング先の API 参照名を確認したか（表示ラベルではなく API 参照名で対応づける）</li>
+      <li>更新・削除の対象を事前に <code>export</code> してバックアップを取ったか</li>
+      <li>レコード ID は 18 桁で揃えたか</li>
+      <li>親レコードが先に存在しているか、または外部 ID で参照解決できるか</li>
+      <li>入力規則・重複ルール・トリガの影響範囲を確認したか</li>
+      <li>まず少量で試験実行し、error.csv を確認したか</li>
+      <li>hard delete を使うなら「一括削除」権限と Bulk API を有効にしたか</li>
+    </ul>
+  </section>
+
+  <!-- ============================ 08 ============================ -->
+  <section id="exam">
+    <div class="sec-head"><span class="num">08</span><h2>試験ポイントの総ざらい</h2></div>
+    <div class="col">
+      <p class="sec-lede">数字と例外はそのまま出題されます。太字部分が答えになりやすい箇所です。</p>
+    </div>
+
+    <ol class="points">
+      <li><span class="k">01</span><span>インポートウィザードの上限は <em>1 回あたり 50,000 件</em>。データローダは <em>最大 500 万件</em>。</span></li>
+      <li><span class="k">02</span><span>ウィザードが対応するのは取引先・取引先責任者・リード・ソリューション・キャンペーンメンバー・個人取引先・カスタムオブジェクト。<em>商談とケースは対象外</em>。</span></li>
+      <li><span class="k">03</span><span><em>重複防止ができるのはウィザードだけ</em>。データローダは upsert の照合キーを使わない限り単純追加になる。</span></li>
+      <li><span class="k">04</span><span>データローダは <em>すべてのオブジェクト</em>に対応し、<em>削除・抽出・upsert</em> もできる。ウィザードは追加と更新のみ。</span></li>
+      <li><span class="k">05</span><span><code>update</code> には <em>レコード ID が必須</em>。ID の無い行はエラーになる。</span></li>
+      <li><span class="k">06</span><span><code>upsert</code> は照合キーが一致すれば更新、なければ挿入。照合キーには <em>レコード ID または外部 ID</em> を使う。</span></li>
+      <li><span class="k">07</span><span>外部 ID は<em>他システムの主キーを保持する項目属性</em>。upsert の照合キーにするには一意である必要がある。</span></li>
+      <li><span class="k">08</span><span><code>delete</code> は<em>ごみ箱へ移動（15 日以内は復元可）</em>、<code>hard delete</code> は<em>復元不可</em>。</span></li>
+      <li><span class="k">09</span><span>hard delete の実行には <em>「一括削除」権限の付与と Bulk API</em> が必要。既定では実行できない。</span></li>
+      <li><span class="k">10</span><span><code>export</code> は有効なレコードのみ、<code>export all</code> は <em>削除済み・ごみ箱内も含む</em>。</span></li>
+      <li><span class="k">11</span><span>データエクスポートサービスは <em>ZIP 形式の CSV 群</em>で組織の全データを出力する。</span></li>
+      <li><span class="k">12</span><span>エクスポート頻度は Enterprise / Unlimited / Performance が <em>週次または月次</em>、それ以外は <em>月次のみ</em>。</span></li>
+      <li><span class="k">13</span><span>生成されたエクスポートファイルの保持期間は <em>48 時間</em>。</span></li>
+      <li><span class="k">14</span><span>レポートエクスポートは <em>「詳細のみ（.csv）」と「フォーマット済み（.xlsx）」</em>の 2 形式。組織全体のバックアップには不十分。</span></li>
+      <li><span class="k">15</span><span>入力規則・必須項目・重複ルールは <em>データローダや API 経由の書き込みにも適用される</em>。</span></li>
+      <li><span class="k">16</span><span>ページレイアウトの読み取り専用は <em>API 経由の更新を防げない</em>。</span></li>
+      <li><span class="k">17</span><span>レコード ID は <em>15 桁（大文字小文字を区別）</em>と <em>18 桁（区別しない）</em>。CSV では 18 桁が安全。</span></li>
+      <li><span class="k">18</span><span>データローダは <em>API を消費する</em>。ウィザードは画面処理なので消費しない。</span></li>
+      <li><span class="k">19</span><span>Bulk API 使用時のバッチサイズは <em>10,000 件</em>、SOAP API では <em>200 件</em>。</span></li>
+      <li><span class="k">20</span><span>データローダは <em>設定を保存してコマンドラインで定期実行</em>できる。ウィザードは毎回手動。</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>
+      SF Learner ／ Salesforce 認定アドミニストレーター学習ポータル — 「データと分析の管理」ドメイン補助教材。<br />
+      記載の上限値・仕様は Salesforce の標準機能に基づきます。エディションやリリースにより異なる場合があるため、実運用の前には公式ドキュメントで最新の値を確認してください。
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
