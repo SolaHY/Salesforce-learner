@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { domainById, domains } from '../data/domains'
-import { studyMaterials } from '../data/studyMaterials'
-import { questionsByDomain } from '../data/quizzes'
-import { flashcardsByDomain } from '../data/flashcards'
+import { useCert } from '../hooks/useCert'
 import { useProgress } from '../hooks/useProgress'
-import { scoreRank, STAGE_CLEAR_PCT } from '../data/gamification'
+import { useLang, pick, hasJa } from '../hooks/useLang'
+import { shortName } from '../data/questionUtils'
+import { scoreRank } from '../data/gamification'
 import QuizRunner from '../components/QuizRunner'
 import Confetti from '../components/Confetti'
 import Figure from '../components/Figure'
+import LangToggle from '../components/LangToggle'
 
 const STEPS = [
   { key: 'input', label: 'インプット', short: '基礎' },
@@ -17,8 +17,6 @@ const STEPS = [
   { key: 'appliedQuiz', label: '応用クイズ', short: 'シナリオ' },
   { key: 'unitTest', label: '単元テスト', short: '総仕上げ' },
 ]
-
-const PASS_PCT = Math.round(STAGE_CLEAR_PCT * 100)
 
 function Stepper({ current, onJump }) {
   return (
@@ -43,24 +41,95 @@ function Stepper({ current, onJump }) {
   )
 }
 
+// セクション1つ。日本語訳を持つ教材では、右上の「日本語」ボタンでその節だけを切り替えられる。
+function Section({ section }) {
+  const { lang: globalLang } = useLang()
+  const [override, setOverride] = useState(null)
+  const lang = override ?? globalLang
+  const bilingual = hasJa(section, ['heading', 'body', 'points'])
+  const points = pick(section, 'points', lang) ?? []
+
+  return (
+    <div className="study-section">
+      <div className="study-section-head">
+        <h3 lang={lang}>{pick(section, 'heading', lang)}</h3>
+        {bilingual && (
+          <LangToggle lang={lang} onToggle={() => setOverride(lang === 'ja' ? 'en' : 'ja')} />
+        )}
+      </div>
+      {pick(section, 'body', lang) && (
+        <p className="study-body" lang={lang}>{pick(section, 'body', lang)}</p>
+      )}
+      {section.figure && <Figure name={section.figure} />}
+      {points.length > 0 && (
+        <ul lang={lang}>
+          {points.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function Sections({ sections }) {
   return (
     <>
       {sections.map((section) => (
-        <div className="study-section" key={section.heading}>
-          <h3>{section.heading}</h3>
-          {section.body && <p className="study-body">{section.body}</p>}
-          {section.figure && <Figure name={section.figure} />}
-          {section.points?.length > 0 && (
-            <ul>
-              {section.points.map((p, i) => (
-                <li key={i}>{p}</li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <Section section={section} key={section.heading} />
       ))}
     </>
+  )
+}
+
+// 単元の導入文。日本語訳があればこれも個別に切り替えられる。
+function Intro({ material }) {
+  const { lang: globalLang } = useLang()
+  const [override, setOverride] = useState(null)
+  const lang = override ?? globalLang
+  const bilingual = hasJa(material, ['intro'])
+  return (
+    <div className="flow-lead-row">
+      <p className="flow-lead" lang={lang}>{pick(material, 'intro', lang)}</p>
+      {bilingual && (
+        <LangToggle lang={lang} onToggle={() => setOverride(lang === 'ja' ? 'en' : 'ja')} />
+      )}
+    </div>
+  )
+}
+
+// 実務ポイント（各問題の reference）1件。
+function Tip({ q, first }) {
+  const { lang: globalLang } = useLang()
+  const [override, setOverride] = useState(null)
+  const lang = override ?? globalLang
+  const bilingual = hasJa(q, ['reference'])
+  return (
+    <div className="reference tip-row" style={{ marginTop: first ? 0 : 10 }} lang={lang}>
+      <span>{pick(q, 'reference', lang)}</span>
+      {bilingual && (
+        <LangToggle lang={lang} onToggle={() => setOverride(lang === 'ja' ? 'en' : 'ja')} />
+      )}
+    </div>
+  )
+}
+
+// 用語カード（重要用語）1件。こちらも個別に日本語へ切り替えられる。
+function Term({ card }) {
+  const { lang: globalLang } = useLang()
+  const [override, setOverride] = useState(null)
+  const lang = override ?? globalLang
+  const bilingual = hasJa(card, ['front', 'back'])
+  return (
+    <div className="term">
+      <dt lang={lang}>
+        {pick(card, 'front', lang)}
+        {bilingual && (
+          <LangToggle lang={lang} onToggle={() => setOverride(lang === 'ja' ? 'en' : 'ja')} />
+        )}
+      </dt>
+      <dd lang={lang}>{pick(card, 'back', lang)}</dd>
+    </div>
   )
 }
 
@@ -68,6 +137,9 @@ export default function UnitFlow() {
   const { domainId } = useParams()
   const navigate = useNavigate()
   const { recordSession } = useProgress()
+  const cert = useCert()
+  const { domains, domainById, studyMaterials, questionsByDomain, flashcardsByDomain } = cert
+  const PASS_PCT = Math.round(cert.stageClearPct * 100)
 
   const [step, setStep] = useState(0)
   const [testResult, setTestResult] = useState(null)
@@ -93,10 +165,20 @@ export default function UnitFlow() {
   const basicSections = sections.slice(0, basicCount)
   const deepSections = sections.slice(basicCount)
   const cards = flashcardsByDomain(domainId)
-  const tips = allQuestions.filter((q) => q.reference).map((q) => q.reference)
+  // 実務ポイントは各問題の reference から集める（日英どちらも持つ場合は個別に切り替えられる）
+  const tips = allQuestions.filter((q) => q.reference || q.reference_ja)
 
-  const easyQuestions = allQuestions.filter((q) => q.type !== 'scenario')
-  const appliedQuestions = allQuestions.filter((q) => q.type === 'scenario')
+  // 簡単クイズ / 応用クイズの振り分け。
+  // シナリオ形式の問題を持つ資格はそれを応用クイズに回す。
+  // すべてが状況設定型で type 'scenario' を持たない資格（Service Cloud など）は、
+  // 前半を簡単クイズ・後半を応用クイズに二分し、どちらのステップも空にならないようにする。
+  const scenarioQuestions = allQuestions.filter((q) => q.type === 'scenario')
+  const hasScenarioType = scenarioQuestions.length > 0
+  const half = Math.ceil(allQuestions.length / 2)
+  const easyQuestions = hasScenarioType
+    ? allQuestions.filter((q) => q.type !== 'scenario')
+    : allQuestions.slice(0, half)
+  const appliedQuestions = hasScenarioType ? scenarioQuestions : allQuestions.slice(half)
 
   function advance() {
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
@@ -118,7 +200,7 @@ export default function UnitFlow() {
       </Link>
       <div className="flow-head">
         <h1 className="page-title" style={{ marginBottom: 2 }}>
-          単元 {unitNo}：{domain.name.split(/[ （(]/)[0]}
+          単元 {unitNo}：{shortName(domain.name)}
         </h1>
         <span className="weight-pill">配点 {domain.weight}%</span>
       </div>
@@ -131,7 +213,7 @@ export default function UnitFlow() {
       {/* ステップ1: インプット */}
       {stepKey === 'input' && (
         <div className="card" style={{ borderLeft: `5px solid ${domain.color}` }}>
-          <p className="flow-lead">{material.intro}</p>
+          <Intro material={material} />
           <Sections sections={basicSections} />
           <div className="flow-actions">
             <button className="btn gold" onClick={advance}>
@@ -169,10 +251,7 @@ export default function UnitFlow() {
               <h3>重要用語</h3>
               <dl className="term-list">
                 {cards.map((c) => (
-                  <div className="term" key={c.id}>
-                    <dt>{c.front}</dt>
-                    <dd>{c.back}</dd>
-                  </div>
+                  <Term card={c} key={c.id} />
                 ))}
               </dl>
             </div>
@@ -181,10 +260,8 @@ export default function UnitFlow() {
           {tips.length > 0 && (
             <div className="study-section">
               <h3>実務ポイント</h3>
-              {tips.map((t, i) => (
-                <div className="reference" key={i} style={{ marginTop: i === 0 ? 0 : 10 }}>
-                  {t}
-                </div>
+              {tips.map((q, i) => (
+                <Tip q={q} key={q.id} first={i === 0} />
               ))}
             </div>
           )}
@@ -201,7 +278,9 @@ export default function UnitFlow() {
       {stepKey === 'appliedQuiz' && (
         <>
           <p className="flow-lead">
-            実際の場面を想定したシナリオ問題です。全{appliedQuestions.length}問。
+            {hasScenarioType
+              ? `実際の場面を想定したシナリオ問題です。全${appliedQuestions.length}問。`
+              : `実際の案件を想定した後半の${appliedQuestions.length}問です。判断の根拠まで説明できるか確認しましょう。`}
           </p>
           <QuizRunner
             key="applied"
@@ -232,6 +311,8 @@ export default function UnitFlow() {
           result={testResult}
           domain={domain}
           unitNo={unitNo}
+          domains={domains}
+          passPct={PASS_PCT}
           onRetry={() => setTestResult(null)}
           navigate={navigate}
         />
@@ -240,9 +321,9 @@ export default function UnitFlow() {
   )
 }
 
-function TestResult({ result, domain, unitNo, onRetry, navigate }) {
+function TestResult({ result, domain, unitNo, domains, passPct: PASS_PCT, onRetry, navigate }) {
   const pct = Math.round((result.score / result.total) * 100)
-  const rank = scoreRank(pct)
+  const rank = scoreRank(pct, PASS_PCT)
   const passed = pct >= PASS_PCT
   const nextDomain = domains[domains.findIndex((d) => d.id === domain.id) + 1]
 
@@ -258,7 +339,7 @@ function TestResult({ result, domain, unitNo, onRetry, navigate }) {
       </p>
       {passed ? (
         <p style={{ color: 'var(--green)', fontWeight: 700 }}>
-          単元 {unitNo} クリア！{nextDomain ? '次の単元が解放されました。' : '全単元を制覇しました。'}
+          単元 {unitNo} クリア！{nextDomain ? '次の単元に進みましょう。' : '全単元を制覇しました。'}
         </p>
       ) : (
         <p style={{ color: 'var(--orange)', fontWeight: 700 }}>

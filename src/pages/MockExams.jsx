@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { mockExams, mockById, PASS_PCT, OFFICIAL_COUNT, SIMILAR_COUNT, EXTRA_COUNT } from '../data/mockExams'
+import { useCert } from '../hooks/useCert'
 import { useProgress } from '../hooks/useProgress'
 import { scoreRank } from '../data/gamification'
 import QuizRunner from '../components/QuizRunner'
@@ -14,6 +14,9 @@ export default function MockExams() {
 
 function MockList() {
   const { progress } = useProgress()
+  const { mocks } = useCert()
+  const { exams: mockExams, passPct: PASS_PCT, intro } = mocks
+
   const bestByMock = {}
   for (const s of progress.sessions || []) {
     if (!s.mockId) continue
@@ -24,9 +27,7 @@ function MockList() {
   return (
     <div>
       <h1 className="page-title">模擬試験</h1>
-      <p className="page-sub">
-        公式プラクティステストと同一の {OFFICIAL_COUNT} 問、その類似問題 {SIMILAR_COUNT} 問、実試験対策問題（japanitstudy / jpnshiken）を合わせた全 {mockExams.reduce((s, mk) => s + mk.total, 0)} 問を、本番想定の約 {mockExams[0].total} 問ずつ全 {mockExams.length} 回分に構成しました。各回はドメインと出典をバランスよくミックスしています。最終回（模試 {mockExams.length}）は全 8 分野を通しで出題する追加セット {EXTRA_COUNT} 問です。合格ラインは {PASS_PCT}% です。
-      </p>
+      <p className="page-sub">{intro}</p>
 
       <div className="grid" style={{ marginTop: 16 }}>
         {mockExams.map((mk) => {
@@ -46,6 +47,7 @@ function MockList() {
                   <span>未受験</span>
                 )}
                 {mk.officialCount > 0 && <span>公式問題 {mk.officialCount} 問</span>}
+                {mk.scenarioCount > 0 && <span>シナリオ {mk.scenarioCount} 問</span>}
                 {mk.tag && <span>{mk.tag}</span>}
               </div>
               <div className="mock-bars" style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', marginBottom: 14 }}>
@@ -77,8 +79,10 @@ function MockList() {
 function MockRunner({ mockId }) {
   const navigate = useNavigate()
   const { recordSession } = useProgress()
+  const { mocks } = useCert()
+  const { exams: mockExams, passPct: PASS_PCT } = mocks
   const [result, setResult] = useState(null)
-  const mock = mockById(mockId)
+  const mock = mockExams.find((mk) => String(mk.id) === String(mockId))
 
   if (!mock) {
     return (
@@ -99,7 +103,7 @@ function MockRunner({ mockId }) {
 
   if (result) {
     const pct = Math.round((result.score / result.total) * 100)
-    const rank = scoreRank(pct)
+    const rank = scoreRank(pct, PASS_PCT)
     const passed = pct >= PASS_PCT
     return (
       <div>

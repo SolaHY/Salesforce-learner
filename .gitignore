@@ -5,3 +5,7 @@ dist-ssr
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# 教材の出典となる練習試験のスクリーンショット（手元のみ・公開リポジトリには含めない）
+ExamScreenShots/
+screenshots/

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { questions } from '../data/quizzes'
+import { useCert } from '../hooks/useCert'
 import { useProgress } from '../hooks/useProgress'
 import { scoreRank } from '../data/gamification'
 import QuizRunner from '../components/QuizRunner'
@@ -9,6 +9,7 @@ import Confetti from '../components/Confetti'
 export default function Exam() {
   const navigate = useNavigate()
   const { recordSession } = useProgress()
+  const { questions, exam } = useCert()
   const [result, setResult] = useState(null)
 
   function finish({ score, total }) {
@@ -19,10 +20,10 @@ export default function Exam() {
 
   if (result) {
     const pct = Math.round((result.score / result.total) * 100)
-    const rank = scoreRank(pct)
+    const rank = scoreRank(pct, exam.passPct)
     return (
       <div>
-        {pct >= 65 && <Confetti />}
+        {pct >= exam.passPct && <Confetti />}
         <h1 className="page-title">修了試験 結果</h1>
         <div className="quiz-card result">
           <div className="result-rank" style={{ color: rank.color }}>

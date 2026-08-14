@@ -1,6 +1,10 @@
 import { useState } from 'react'
-import { correctIndices, isMulti } from '../data/quizzes'
+import { correctIndices, isMulti } from '../data/questionUtils'
 import { useProgress } from '../hooks/useProgress'
+import { useLang, pick, hasJa } from '../hooks/useLang'
+import LangToggle from './LangToggle'
+
+const Q_FIELDS = ['question', 'scenario', 'explanation', 'reference']
 
 function setsEqual(a, b) {
   if (a.length !== b.length) return false
@@ -28,6 +32,9 @@ function shuffleDeck(questions) {
 // 全問終了後 onComplete({ score, total }) を呼ぶ。結果画面は親が描画する。
 export default function QuizRunner({ questions, onComplete, nextLabel = '次へ', recordAnswers = true }) {
   const { recordAnswer } = useProgress()
+  const { lang: globalLang } = useLang()
+  // この設問だけの言語上書き（null = グローバル設定に従う）。次の問題に進むと解除される。
+  const [langOverride, setLangOverride] = useState(null)
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState([])
   const [submitted, setSubmitted] = useState(false)
@@ -52,6 +59,11 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
 
   const current = deck[index]
   if (!current) return null
+
+  // 表示言語：この設問だけの上書き > グローバル設定
+  const lang = langOverride ?? globalLang
+  const bilingual =
+    hasJa(current, Q_FIELDS) || current.options.some((o) => hasJa(o, ['text', 'note']))
 
   const answerIdx = correctIndices(current)
   const multi = isMulti(current)
@@ -92,6 +104,7 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
     setIndex((i) => i + 1)
     setSelected([])
     setSubmitted(false)
+    setLangOverride(null)
   }
 
   const progressPct = Math.round((index / deck.length) * 100)
@@ -104,7 +117,15 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
           {current.source === 'official' && <span className="source-pill">公式問題</span>}
           {current.source === 'similar' && <span className="source-pill alt">類似問題</span>}
         </span>
-        <span>正解 {score}</span>
+        <span className="quiz-progress-right">
+          {bilingual && (
+            <LangToggle
+              lang={lang}
+              onToggle={() => setLangOverride(lang === 'ja' ? 'en' : 'ja')}
+            />
+          )}
+          正解 {score}
+        </span>
       </div>
       <div className="battle-bar">
         <span style={{ width: `${progressPct}%` }} />
@@ -113,11 +134,11 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
       {current.type === 'scenario' && (
         <div className="scenario-box">
           <span className="scenario-tag">シナリオ問題</span>
-          {current.scenario}
+          {pick(current, 'scenario', lang)}
         </div>
       )}
 
-      <p className="quiz-question">{current.question}</p>
+      <p className="quiz-question" lang={lang}>{pick(current, 'question', lang)}</p>
       {multi && (
         <p className="page-sub" style={{ marginTop: -12 }}>
           （該当するものをすべて選択）
@@ -137,14 +158,14 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
           return (
             <div key={i}>
               <button className={cls} onClick={() => toggleOption(i)} disabled={submitted}>
-                <span>{opt.text}</span>
+                <span lang={lang}>{pick(opt, 'text', lang)}</span>
                 {submitted && isAnswer && <span className="mark">✓</span>}
                 {submitted && selected.includes(i) && !isAnswer && <span className="mark">✗</span>}
               </button>
               {submitted && (
-                <div className={`opt-note ${isAnswer ? 'ok' : 'ng'}`}>
+                <div className={`opt-note ${isAnswer ? 'ok' : 'ng'}`} lang={lang}>
                   <strong>{isAnswer ? '○ ' : '× '}</strong>
-                  {opt.note}
+                  {pick(opt, 'note', lang)}
                 </div>
               )}
             </div>
@@ -156,14 +177,16 @@ export default function QuizRunner({ questions, onComplete, nextLabel = '次へ'
         <>
           <div className={`explanation ${correct ? 'ok' : 'ng'}`}>
             <strong>{correct ? '正解' : '不正解'}</strong>
-            <p style={{ margin: '8px 0 0' }}>{current.explanation}</p>
+            <p style={{ margin: '8px 0 0' }} lang={lang}>{pick(current, 'explanation', lang)}</p>
             {!correct && (
               <p style={{ margin: '8px 0 0', opacity: 0.85 }}>
                 「選び直す」でこの問題にもう一度挑戦できます（成績は最初の回答で確定します）。
               </p>
             )}
           </div>
-          {current.reference && <div className="reference">{current.reference}</div>}
+          {pick(current, 'reference', lang) && (
+            <div className="reference" lang={lang}>{pick(current, 'reference', lang)}</div>
+          )}
         </>
       )}
 

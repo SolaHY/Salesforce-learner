@@ -1,19 +1,17 @@
 import { Link } from 'react-router-dom'
-import { roadmap, resources } from '../data/roadmap'
-import { domains } from '../data/domains'
+import { useCert } from '../hooks/useCert'
 import { useProgress } from '../hooks/useProgress'
-import { isStageCleared } from '../data/gamification'
 
 export default function Roadmap() {
-  const { progress } = useProgress()
-  const clearedCount = domains.filter((d) => isStageCleared(progress, d.id)).length
+  const { stagesCleared: clearedCount } = useProgress()
+  const { domains, roadmap, resources, name } = useCert()
   const overallPct = Math.round((clearedCount / domains.length) * 100)
 
   return (
     <div>
       <h1 className="page-title">🧭 学習ロードマップ</h1>
       <p className="page-sub">
-        合格までの推奨ルート。上から順に進めると、配点の大きい領域から効率よく攻略できます。
+        {name}の合格までの推奨ルート。上から順に進めると、効率よく攻略できます。
       </p>
 
       <div className="card" style={{ marginBottom: 24, borderColor: 'var(--border-glow)' }}>

@@ -29,14 +29,7 @@ export const questions = [
   ...agentforceQuestions,
 ]
 
-// 正解インデックスの配列を返すヘルパー
-export function correctIndices(question) {
-  return question.options.reduce((acc, o, i) => (o.correct ? [...acc, i] : acc), [])
-}
-
-export function isMulti(question) {
-  return question.options.filter((o) => o.correct).length > 1
-}
+export { correctIndices, isMulti } from './questionUtils'
 
 export const questionsByDomain = (domainId) =>
   questions.filter((q) => q.domain === domainId)

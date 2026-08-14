@@ -1,20 +1,25 @@
 import { useState, useMemo } from 'react'
-import { domains, domainById } from '../data/domains'
-import { flashcards } from '../data/flashcards'
+import { shortName } from '../data/questionUtils'
+import { useCert } from '../hooks/useCert'
 import { useProgress } from '../hooks/useProgress'
+import { useLang, pick, hasJa } from '../hooks/useLang'
+import LangToggle from '../components/LangToggle'
 
 export default function Flashcards() {
   const { progress, toggleReviewed } = useProgress()
+  const { domains, domainById, flashcards } = useCert()
+  const { lang: globalLang } = useLang()
+  const [langOverride, setLangOverride] = useState(null)
   const [filter, setFilter] = useState('all')
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
 
   const deck = useMemo(
     () => (filter === 'all' ? flashcards : flashcards.filter((c) => c.domain === filter)),
-    [filter],
+    [filter, flashcards],
   )
 
-  const card = deck[index]
+  const card = deck[index % Math.max(deck.length, 1)]
 
   function changeFilter(f) {
     setFilter(f)
@@ -24,6 +29,7 @@ export default function Flashcards() {
 
   function go(delta) {
     setFlipped(false)
+    setLangOverride(null)
     setIndex((i) => (i + delta + deck.length) % deck.length)
   }
 
@@ -33,6 +39,8 @@ export default function Flashcards() {
 
   const reviewed = progress.reviewedCards.includes(card.id)
   const domain = domainById[card.domain]
+  const lang = langOverride ?? globalLang
+  const bilingual = hasJa(card, ['front', 'back'])
 
   return (
     <div>
@@ -54,10 +62,20 @@ export default function Flashcards() {
             className={`chip ${filter === d.id ? 'active' : ''}`}
             onClick={() => changeFilter(d.id)}
           >
-            {d.name.split(/[ （(]/)[0]}
+            {shortName(d.name)}
           </button>
         ))}
       </div>
+
+      {bilingual && (
+        <div className="card-lang-row">
+          <LangToggle
+            lang={lang}
+            size="md"
+            onToggle={() => setLangOverride(lang === 'ja' ? 'en' : 'ja')}
+          />
+        </div>
+      )}
 
       <div
         className={`flashcard ${flipped ? 'flipped' : ''}`}
@@ -66,12 +84,12 @@ export default function Flashcards() {
         <div className="flashcard-inner">
           <div className="flashcard-face flashcard-front">
             <div className="tag">{domain?.name}</div>
-            <div className="text">{card.front}</div>
+            <div className="text" lang={lang}>{pick(card, 'front', lang)}</div>
             <div className="flashcard-hint">クリックで答えを表示</div>
           </div>
           <div className="flashcard-face flashcard-back">
             <div className="tag">答え</div>
-            <div className="text">{card.back}</div>
+            <div className="text" lang={lang}>{pick(card, 'back', lang)}</div>
           </div>
         </div>
       </div>

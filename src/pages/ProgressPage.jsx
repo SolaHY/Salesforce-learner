@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
-import { domains } from '../data/domains'
-import { questions } from '../data/quizzes'
+import { useCert } from '../hooks/useCert'
 import { useProgress } from '../hooks/useProgress'
-import { BADGES, AVATAR_RANKS, isStageCleared } from '../data/gamification'
 import Avatar from '../components/Avatar'
 
 function formatDate(ts) {
@@ -13,7 +11,9 @@ function formatDate(ts) {
 }
 
 export default function ProgressPage() {
-  const { progress, stagesCleared, rank, reset } = useProgress()
+  const { progress, stagesCleared, stageCleared, rank, reset } = useProgress()
+  const cert = useCert()
+  const { domains, questions, ranks, badges } = cert
 
   const answeredEntries = Object.entries(progress.answers)
   const answered = answeredEntries.length
@@ -21,13 +21,15 @@ export default function ProgressPage() {
   const accuracy = answered ? Math.round((correct / answered) * 100) : 0
 
   function handleReset() {
-    if (window.confirm('学習データをすべて削除します。よろしいですか？')) reset()
+    if (window.confirm(`「${cert.name}」の学習データをすべて削除します。よろしいですか？`)) reset()
   }
 
   return (
     <div>
       <h1 className="page-title">進捗・実績</h1>
-      <p className="page-sub">これまでの学習状況と、成長したキャラクターを確認できます。</p>
+      <p className="page-sub">
+        {cert.name}の学習状況と、成長したキャラクターを確認できます。（進捗は資格ごとに独立して保存されます）
+      </p>
 
       {/* アバター + ステータス */}
       <div className="growth-card" style={{ marginBottom: 24 }}>
@@ -54,7 +56,7 @@ export default function ProgressPage() {
         単元をクリアするたびにキャラクターが成長します。（{stagesCleared} / {domains.length} 段階）
       </p>
       <div className="evolution-row">
-        {AVATAR_RANKS.map((r, i) => {
+        {ranks.map((r, i) => {
           const reached = i <= stagesCleared
           return (
             <div key={i} className={`evo-cell ${reached ? 'reached' : 'locked'}`}>
@@ -91,10 +93,10 @@ export default function ProgressPage() {
 
       {/* 実績バッジ */}
       <h2 className="section-title">
-        実績バッジ（{progress.badges.length}/{BADGES.length}）
+        実績バッジ（{progress.badges.length}/{badges.length}）
       </h2>
       <div className="badge-grid" style={{ margin: '12px 0 28px' }}>
-        {BADGES.map((b) => {
+        {badges.map((b) => {
           const got = progress.badges.includes(b.id)
           return (
             <div key={b.id} className={`badge-cell ${got ? 'unlocked' : 'locked'}`}>
@@ -113,7 +115,7 @@ export default function ProgressPage() {
           const dq = questions.filter((q) => q.domain === d.id)
           const dCorrect = dq.filter((q) => progress.answers[q.id]?.correct).length
           const pct = dq.length ? Math.round((dCorrect / dq.length) * 100) : 0
-          const cleared = isStageCleared(progress, d.id)
+          const cleared = stageCleared(d.id)
           return (
             <div className="card" key={d.id} style={{ padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -173,7 +175,7 @@ export default function ProgressPage() {
 
       <div style={{ marginTop: 32 }}>
         <button className="btn secondary" onClick={handleReset}>
-          学習データをリセット
+          この資格の学習データをリセット
         </button>
       </div>
     </div>

@@ -1,10 +1,12 @@
 import { createContext, useContext, useCallback, useMemo, useState, useRef } from 'react'
 import { useLocalStorage } from './useLocalStorage'
-import { questions } from '../data/quizzes'
-import { flashcards } from '../data/flashcards'
-import { BADGES, stagesClearedCount, avatarRank } from '../data/gamification'
+import { useCert } from './useCert'
+import { stagesClearedCount, avatarRank, isStageCleared } from '../data/gamification'
 
+// 進捗は資格ごとに別のキーで保存する。
+// 'sf-learner-progress-v2' はアドミニストレーターの既存データなので、そのまま引き継ぐ。
 const STORAGE_KEY = 'sf-learner-progress-v2'
+const storageKeyFor = (certId) => (certId === 'admin' ? STORAGE_KEY : `${STORAGE_KEY}:${certId}`)
 
 const emptyProgress = {
   answers: {}, // questionId -> { correct, attempts, lastAt }
@@ -12,11 +14,6 @@ const emptyProgress = {
   reviewedCards: [], // 復習済みカード id
   badges: [], // 解放済みバッジ id
   streak: { count: 0, best: 0, lastDate: null }, // 連続学習日数
-}
-
-const derived = {
-  totalQuestions: questions.length,
-  totalCards: flashcards.length,
 }
 
 function normalize(p) {
@@ -40,11 +37,22 @@ function dayDiff(a, b) {
 const ProgressContext = createContext(null)
 
 export function ProgressProvider({ children }) {
-  const [stored, setStored] = useLocalStorage(STORAGE_KEY, emptyProgress)
+  const cert = useCert()
+  const [stored, setStored] = useLocalStorage(storageKeyFor(cert.id), emptyProgress)
   const progress = useMemo(() => normalize(stored), [stored])
 
   const [toasts, setToasts] = useState([])
   const toastSeq = useRef(0)
+
+  const derived = useMemo(
+    () => ({
+      totalQuestions: cert.questions.length,
+      totalCards: cert.flashcards.length,
+      domains: cert.domains,
+      clearPct: cert.stageClearPct,
+    }),
+    [cert],
+  )
 
   const pushToast = useCallback((toast) => {
     const id = ++toastSeq.current
@@ -52,11 +60,11 @@ export function ProgressProvider({ children }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000)
   }, [])
 
-  // 共通の更新処理：XP・ストリーク・バッジ・レベルアップを処理してトーストを出す
+  // 共通の更新処理：ストリーク・バッジ・単元クリアを処理してトーストを出す
   const applyUpdate = useCallback(
     (mutate, { touchStreak = true } = {}) => {
       const before = normalize(stored)
-      const beforeStages = stagesClearedCount(before)
+      const beforeStages = stagesClearedCount(before, cert.domains, cert.stageClearPct)
       const next = mutate({ ...before })
 
       if (touchStreak) {
@@ -77,7 +85,7 @@ export function ProgressProvider({ children }) {
 
       // バッジ判定
       const newlyUnlocked = []
-      for (const badge of BADGES) {
+      for (const badge of cert.badges) {
         if (!next.badges.includes(badge.id) && badge.check(next, derived)) {
           next.badges = [...next.badges, badge.id]
           newlyUnlocked.push(badge)
@@ -87,12 +95,12 @@ export function ProgressProvider({ children }) {
       setStored(next)
 
       // 演出トースト
-      const afterStages = stagesClearedCount(next)
+      const afterStages = stagesClearedCount(next, cert.domains, cert.stageClearPct)
       if (afterStages > beforeStages) {
         pushToast({
           type: 'evolve',
           title: '単元クリア！キャラクターが成長しました',
-          desc: `新しい称号：${avatarRank(afterStages).title}`,
+          desc: `新しい称号：${avatarRank(afterStages, cert.ranks).title}`,
         })
       }
       newlyUnlocked.forEach((b) =>
@@ -101,7 +109,7 @@ export function ProgressProvider({ children }) {
 
       return next
     },
-    [stored, setStored, pushToast],
+    [stored, setStored, pushToast, cert, derived],
   )
 
   const recordAnswer = useCallback(
@@ -152,19 +160,26 @@ export function ProgressProvider({ children }) {
 
   const reset = useCallback(() => setStored(emptyProgress), [setStored])
 
-  const stagesCleared = stagesClearedCount(progress)
+  const stagesCleared = stagesClearedCount(progress, cert.domains, cert.stageClearPct)
+  // 資格ごとのクリア判定ラインを織り込んだヘルパー（各ページから使う）
+  const stageCleared = useCallback(
+    (domainId) => isStageCleared(progress, domainId, cert.stageClearPct),
+    [progress, cert.stageClearPct],
+  )
+
   const value = useMemo(
     () => ({
       progress,
       stagesCleared,
-      rank: avatarRank(stagesCleared),
+      stageCleared,
+      rank: avatarRank(stagesCleared, cert.ranks),
       recordAnswer,
       recordSession,
       toggleReviewed,
       reset,
       toasts,
     }),
-    [progress, stagesCleared, recordAnswer, recordSession, toggleReviewed, reset, toasts],
+    [progress, stagesCleared, stageCleared, cert.ranks, recordAnswer, recordSession, toggleReviewed, reset, toasts],
   )
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>
