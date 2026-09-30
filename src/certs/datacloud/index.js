@@ -12,6 +12,13 @@ import {
   PASS_COUNT,
   TIME_LIMIT_MIN,
 } from './mockExams'
+import {
+  glossary,
+  glossaryById,
+  glossaryCategories,
+  glossaryFlow,
+  glossaryIntro,
+} from './glossary'
 import { makeBadges } from '../../data/gamification'
 
 // 単元クリアの判定ライン。本番の合格ラインに合わせて70%とする。
@@ -52,6 +59,14 @@ export const dataCloudCert = {
   flashcardsByDomain,
   roadmap,
   resources,
+  // 用語集（任意）。持っている資格だけナビに「用語集」が出る。
+  glossary: {
+    terms: glossary,
+    byId: glossaryById,
+    categories: glossaryCategories,
+    flow: glossaryFlow,
+    intro: glossaryIntro,
+  },
   ranks,
   badges: makeBadges({ unitLabel: '単元' }),
   mocks: {

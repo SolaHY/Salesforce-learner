@@ -1451,6 +1451,329 @@ nav {
   }
 }
 
+/* ============ Glossary ============ */
+/* 上部の流れ図：接続 → 調和 → 統合 → 分析 → 実行 */
+.gl-flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.gl-flow-step {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.12s;
+}
+.gl-flow-step.active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-tint);
+}
+/* 段階の間の矢印 */
+.gl-flow-step + .gl-flow-step::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: 24px;
+  border: 5px solid transparent;
+  border-left-color: var(--border-glow);
+}
+.gl-flow-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 10px;
+  border: none;
+  background: none;
+  font-family: var(--body-font);
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.gl-flow-head strong {
+  display: block;
+  font-size: 14px;
+}
+.gl-flow-head small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.gl-flow-num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--blue-deep);
+  background: var(--blue-tint);
+}
+.gl-flow-step ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.gl-flow-step li button {
+  width: 100%;
+  text-align: left;
+  font-family: var(--body-font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.gl-flow-step li button:hover {
+  border-color: var(--blue);
+  color: var(--blue-deep);
+}
+
+.gl-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.gl-search {
+  flex: 1 1 280px;
+  min-width: 0;
+  font-family: var(--body-font);
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+.gl-search:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-tint);
+}
+.gl-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 1 260px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.gl-progress strong {
+  color: var(--text);
+}
+.gl-toolbar {
+  margin-bottom: 12px;
+}
+.gl-switches {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.gl-switches label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.gl-cat-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin: -6px 0 16px;
+}
+
+.gl-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.gl-term {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px 12px;
+  box-shadow: var(--shadow-sm);
+  scroll-margin-top: 80px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.gl-term.learned {
+  border-left: 3px solid var(--green);
+}
+.gl-term.focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px var(--blue-tint);
+}
+.gl-term-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.gl-term-head h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.gl-term-ja {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.gl-cat-tag {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.gl-term-lang {
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 -4px;
+}
+.gl-def {
+  font-size: 13.5px;
+  line-height: 1.8;
+  margin: 8px 0 10px;
+}
+.gl-tip {
+  font-size: 12.5px;
+  line-height: 1.75;
+  background: var(--gold-tint);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 10px;
+}
+.gl-tip > span,
+.gl-vs > span {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-bottom: 2px;
+}
+.gl-vs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.gl-vs > span {
+  flex-basis: 100%;
+  color: var(--muted);
+  margin-bottom: 0;
+}
+.gl-vs button {
+  font-family: var(--body-font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue-deep);
+  background: var(--blue-tint);
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.gl-vs button:hover {
+  text-decoration: underline;
+}
+.gl-reveal {
+  display: block;
+  width: 100%;
+  margin: 12px 0 6px;
+  padding: 14px;
+  font-family: var(--body-font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue-deep);
+  background: var(--panel-2);
+  border: 1px dashed var(--border-glow);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.gl-reveal:hover {
+  background: var(--blue-tint);
+}
+.gl-term-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.gl-link {
+  font-family: var(--body-font);
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.gl-learn {
+  font-family: var(--body-font);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.gl-learn:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+.gl-learn.on {
+  color: #fff;
+  background: var(--green);
+  border-color: var(--green);
+}
+.gl-footnote {
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.gl-footnote a {
+  color: var(--blue-deep);
+}
+
+@media (max-width: 1100px) {
+  .gl-flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .gl-flow-step + .gl-flow-step::before {
+    display: none;
+  }
+}
+
 /* ============ Mobile shell ============
    スマホでは 268px のサイドバーを畳み、
    固定ヘッダー（資格と進捗）＋ボトムナビ（画面移動）＋ドロワー（資格・言語の切替）に置き換える。
@@ -1755,6 +2078,7 @@ nav {
     margin: 8px -16px 20px;
     padding: 2px 16px 8px;
     scroll-snap-type: x proximity;
+    scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
@@ -1935,5 +2259,31 @@ nav {
   }
   .quiz-question {
     font-size: 15.5px;
+  }
+}
+
+/* 用語集のスマホ表示：流れ図は横スクロールの帯、カードは1列 */
+@media (max-width: 860px) {
+  .gl-flow {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    margin-bottom: 18px;
+    padding: 2px 0 6px;
+    scroll-snap-type: x proximity;
+  }
+  .gl-flow-step {
+    flex: 0 0 158px;
+    scroll-snap-align: start;
+  }
+  .gl-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gl-progress {
+    flex: 1 1 100%;
+  }
+  .gl-switches {
+    flex-direction: column;
+    gap: 8px;
   }
 }

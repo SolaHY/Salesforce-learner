@@ -12,15 +12,23 @@ import MockExams from './pages/MockExams'
 import Flashcards from './pages/Flashcards'
 import ProgressPage from './pages/ProgressPage'
 import Roadmap from './pages/Roadmap'
+import Glossary from './pages/Glossary'
 
 // short は幅の狭いスマホのボトムナビ用（ラベルが折り返さない長さにしている）
+// requires を持つ項目は、その教材を持つ資格でだけ表示する。
 const navItems = [
   { to: '/', label: '学習マップ', short: 'マップ', icon: '◈', end: true },
   { to: '/roadmap', label: 'ロードマップ', short: 'ロード', icon: '◇' },
   { to: '/mock', label: '模擬試験', short: '模試', icon: '◎' },
   { to: '/flashcards', label: 'フラッシュカード', short: 'カード', icon: '▢' },
+  { to: '/glossary', label: '用語集', short: '用語', icon: '≡', requires: 'glossary' },
   { to: '/progress', label: '進捗・実績', short: '進捗', icon: '▦' },
 ]
+
+function useNavItems() {
+  const cert = useCert()
+  return navItems.filter((item) => !item.requires || cert[item.requires])
+}
 
 function CertSwitcher() {
   const { id, certs, switchCert } = useCert()
@@ -154,9 +162,10 @@ function MobileDrawer({ open, onClose }) {
 }
 
 function MobileNav() {
+  const items = useNavItems()
   return (
-    <nav className="mobile-nav">
-      {navItems.map((item) => (
+    <nav className="mobile-nav" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}>
+      {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -175,6 +184,7 @@ function Shell() {
   const cert = useCert()
   const { pathname } = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const items = useNavItems()
 
   // 画面が変わったらドロワーを閉じ、ページ先頭へ戻す。
   // スマホでは前の画面のスクロール位置が残ると本文の途中から始まってしまう。
@@ -199,7 +209,7 @@ function Shell() {
         {cert.bilingual && <LangSwitcher />}
         <HeroPanel />
         <nav>
-          {navItems.map((item) => (
+          {items.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -222,6 +232,7 @@ function Shell() {
           <Route path="/mock" element={<MockExams />} />
           <Route path="/mock/:mockId" element={<MockExams />} />
           <Route path="/flashcards" element={<Flashcards />} />
+          <Route path="/glossary" element={<Glossary />} />
           <Route path="/progress" element={<ProgressPage />} />
         </Routes>
       </main>
